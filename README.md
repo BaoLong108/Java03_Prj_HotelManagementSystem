@@ -1,2 +1,46 @@
-# Java03_Prj_HotelManagementSystem
+# Hotel PMS Mini
+
+Monorepo cho đồ án quản lý một khách sạn. Nguyễn Ngọc Bảo Long phụ trách kỹ thuật và tích hợp. Kế hoạch chia 4 sprint, 5 thành viên; ưu tiên hoàn thành các việc P0 trước.
+
+## Cấu trúc
+
+```text
+backend/                 Spring Boot API, Java 21, PostgreSQL, Flyway
+  src/main/java/com/hotelpms/
+    auth/                Tài khoản, role, customer profile, JWT
+    room/                RoomType, PhysicalRoom, RoomBlock, availability
+    booking/             Booking, hold, trạng thái và job
+    pricing/             Quote, giá và discount snapshot
+    payment/             Thanh toán demo, sau đó VNPay Sandbox
+    loyalty/             Điểm và hạng khách hàng
+    shared/              Cấu hình và thành phần dùng chung
+  src/main/resources/db/migration/  Migration SQL theo thứ tự Flyway
+frontend/                React + TypeScript + Vite
+  src/features/           Mã giao diện theo nghiệp vụ
+  src/shared/api/         API client dùng chung
+docs/                    Quy ước kiến trúc, API, cộng tác
+compose.yaml             PostgreSQL cho local
+```
+
+Các màn hình hiện là placeholder; chưa có đăng nhập, đặt phòng hoặc thanh toán thật. Backend chỉ mở `/actuator/health`; endpoint khác mặc định bị từ chối cho tới khi module auth/RBAC được triển khai.
+
+## Chạy local
+
+Yêu cầu: Java 21+, Node.js 22.12+, Docker Compose. Repo có Maven Wrapper nên không cần cài Maven.
+
+1. Sao chép `.env.example` thành `.env` nếu muốn đổi cấu hình PostgreSQL. Giá trị mặc định chỉ dành cho local.
+2. Chạy `docker compose up -d postgres` tại gốc repo.
+3. Chạy backend: `cd backend` rồi `./mvnw spring-boot:run` (PowerShell dùng `.\mvnw.cmd spring-boot:run`). API ở `http://localhost:8080/actuator/health`.
+4. Chạy frontend ở terminal khác: `cd frontend`, `npm ci`, `npm run dev`. Mở địa chỉ Vite in ra, thường là `http://localhost:5173`.
+
+Backend mặc định dùng `jdbc:postgresql://localhost:5432/hotel_pms`, user `hotel_pms`, password `hotel_pms_dev`. Có thể đổi qua `DB_URL`, `DB_USER`, `DB_PASSWORD`. Frontend dev server proxy `/api` và `/actuator` sang backend. Khi dùng API ở host khác, đặt `VITE_API_BASE_URL` trong `frontend/.env.local`.
+
+## Kiểm tra trước PR
+
+```text
+backend:  ./mvnw verify       (Windows: .\mvnw.cmd verify)
+frontend: npm ci && npm run build
+```
+
+Xem [kiến trúc](docs/architecture.md), [hợp đồng API](docs/api-contract.md), [phân công](docs/ownership.md) và [quy trình cộng tác](docs/contributing.md) trước khi bắt đầu task. File kế hoạch Excel là nguồn phân công và tiêu chí hoàn thành; các file `docs/` ghi quyết định kỹ thuật để code giữa các module khớp nhau.
 
