@@ -3,6 +3,7 @@
 ## Ranh giới
 
 - Một khách sạn. Khách chọn `RoomType`; backend tự chọn và gán một `PhysicalRoom` lúc tạo hold. Không lộ số phòng trong luồng tìm/đặt của khách.
+- Guest chưa đăng nhập được xem/tìm phòng và lấy quote; để tạo hold/booking hoặc thanh toán phải đăng nhập thành Customer. Guest không có bản ghi user trong DB.
 - Thời gian lưu bằng `startAt`, `endAt`; khoảng ở dạng nửa mở `[startAt, endAt)`. Mặc định nhận phòng 12:00, trả phòng 10:00 ngày cuối. Hai lượt kề nhau có 2 giờ xoay vòng.
 - `RoomBlock` chặn một phòng vật lý theo khoảng thời gian, không dùng cờ `available` hiện tại để tính tương lai. Không cho block mới phủ booking đã xác nhận hoặc hold còn hiệu lực.
 - Booking: `PENDING_PAYMENT` → `CONFIRMED` → `COMPLETED`; nhánh khác là `CANCELLED` hoặc `EXPIRED`. Hold giữ phòng 15 phút. Job hết hạn và hoàn tất phải an toàn khi chạy lặp.

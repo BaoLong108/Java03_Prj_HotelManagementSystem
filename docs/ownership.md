@@ -10,4 +10,4 @@
 
 Thứ tự phụ thuộc S1: nền tảng → schema auth/room/booking → hợp đồng quote và auth UI. S2 tập trung availability, quote, hold và thanh toán demo. S3 mở rộng staff, loyalty và VNPay. S4 kiểm thử tích hợp, bàn giao.
 
-P0 là ưu tiên demo; P1 bổ sung nghiệp vụ; P2 làm sau khi P0/P1 ổn định. Xem file Excel kế hoạch gốc để lấy đầy đủ 42 task, người phụ trách và tiêu chí hoàn thành. Scaffold này chưa đánh dấu task nào hoàn thành.
+P0 là ưu tiên demo; P1 bổ sung nghiệp vụ; P2 làm sau khi P0/P1 ổn định. Xem file Excel kế hoạch gốc để lấy đầy đủ 42 task, người phụ trách và tiêu chí hoàn thành. Schema V1 là nền chung; các API và UI nghiệp vụ vẫn cần được triển khai.

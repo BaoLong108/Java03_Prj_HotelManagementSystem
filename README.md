@@ -42,5 +42,5 @@ backend:  ./mvnw verify       (Windows: .\mvnw.cmd verify)
 frontend: npm ci && npm run build
 ```
 
-Xem [kiến trúc](docs/architecture.md), [hợp đồng API](docs/api-contract.md), [phân công](docs/ownership.md) và [quy trình cộng tác](docs/contributing.md) trước khi bắt đầu task. File kế hoạch Excel là nguồn phân công và tiêu chí hoàn thành; các file `docs/` ghi quyết định kỹ thuật để code giữa các module khớp nhau.
+Xem [schema và quy ước đặt tên DB](docs/database.md), [kiến trúc](docs/architecture.md), [hợp đồng API](docs/api-contract.md), [phân công](docs/ownership.md) và [quy trình cộng tác](docs/contributing.md) trước khi bắt đầu task. File kế hoạch Excel là nguồn phân công và tiêu chí hoàn thành; các file `docs/` ghi quyết định kỹ thuật để code giữa các module khớp nhau.
 

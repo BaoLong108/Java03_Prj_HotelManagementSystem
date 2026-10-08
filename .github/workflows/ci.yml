@@ -7,6 +7,20 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: hotel_pms
+          POSTGRES_USER: hotel_pms
+          POSTGRES_PASSWORD: hotel_pms_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hotel_pms -d hotel_pms"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -18,6 +32,28 @@ jobs:
       - name: Verify backend
         working-directory: backend
         run: bash ./mvnw -B verify
+      - name: Start API and verify Flyway migration
+        working-directory: backend
+        env:
+          DB_URL: jdbc:postgresql://localhost:5432/hotel_pms
+          DB_USER: hotel_pms
+          DB_PASSWORD: hotel_pms_dev
+        run: |
+          java -jar target/*.jar > startup.log 2>&1 &
+          app_pid=$!
+          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent http://localhost:8080/actuator/health; then
+              exit 0
+            fi
+            if ! kill -0 "$app_pid" 2>/dev/null; then
+              cat startup.log
+              exit 1
+            fi
+            sleep 2
+          done
+          cat startup.log
+          exit 1
 
   frontend:
     runs-on: ubuntu-latest
