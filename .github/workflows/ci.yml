@@ -31,13 +31,18 @@ jobs:
           cache-dependency-path: backend/pom.xml
       - name: Verify backend
         working-directory: backend
-        run: bash ./mvnw -B verify
+        env:
+          TEST_DB_URL: jdbc:postgresql://localhost:5432/hotel_pms
+          TEST_DB_USER: hotel_pms
+          TEST_DB_PASSWORD: hotel_pms_dev
+        run: bash ./mvnw -B -ntp verify
       - name: Start API and verify Flyway migration
         working-directory: backend
         env:
           DB_URL: jdbc:postgresql://localhost:5432/hotel_pms
           DB_USER: hotel_pms
           DB_PASSWORD: hotel_pms_dev
+          JWT_SECRET: ci-only-signing-key-not-for-deployment-at-least-32-characters
         run: |
           java -jar target/*.jar > startup.log 2>&1 &
           app_pid=$!
@@ -54,6 +59,12 @@ jobs:
           done
           cat startup.log
           exit 1
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-reports
+          path: backend/target/surefire-reports/
 
   frontend:
     runs-on: ubuntu-latest

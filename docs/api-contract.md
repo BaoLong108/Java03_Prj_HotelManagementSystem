@@ -18,4 +18,4 @@
 | `STAFF` | Tra cứu booking, xem lịch phòng, tạo/mở RoomBlock theo quyền |
 | `ADMIN` | Quản lý danh mục loại phòng/phòng vật lý và quyền quản trị |
 
-Trước khi code các luồng phụ thuộc nhau, cập nhật ví dụ request/response trong PR của endpoint. Tài liệu này chưa khẳng định các API nghiệp vụ đã tồn tại.
+Các API Auth đã có hợp đồng và ví dụ trong [docs/auth.md](auth.md). Trước khi code các luồng phụ thuộc nhau, cập nhật ví dụ request/response trong PR của endpoint nghiệp vụ mới.

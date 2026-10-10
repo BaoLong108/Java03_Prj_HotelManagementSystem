@@ -1,0 +1,7 @@
+# Public development credentials only. Activate explicitly with the dev profile.
+app:
+  jwt:
+    secret: ${JWT_SECRET:hotel-pms-development-signing-key-change-outside-local-dev}
+  demo-seed:
+    enabled: ${DEMO_SEED_ENABLED:true}
+    password: ${DEMO_SEED_PASSWORD:HotelPmsDemo123!}
