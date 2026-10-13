@@ -22,7 +22,7 @@ docs/                    Quy ước kiến trúc, API, cộng tác
 compose.yaml             PostgreSQL cho local
 ```
 
-Backend đã có entity tài khoản, đăng ký/đăng nhập JWT và `/api/v1/auth/me`. Xem [hợp đồng API Auth](docs/auth.md) để frontend tích hợp. Các màn hình hiện là placeholder; các module đặt phòng/thanh toán và RBAC theo nghiệp vụ sẽ được triển khai ở task tiếp theo.
+Backend đã có entity tài khoản, đăng ký/đăng nhập JWT và `/api/v1/auth/me`. Frontend đã có layout responsive, component chung, đăng ký/đăng nhập nối API thật, phiên đăng nhập và menu theo vai trò. Xem [hướng dẫn frontend](frontend/README.md) để nhóm tiếp tục theo cùng mẫu và [hợp đồng API Auth](docs/auth.md). Các trang phòng/booking/vận hành hiện là khung chờ API nghiệp vụ.
 
 ## Chạy local
 

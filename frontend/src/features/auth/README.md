@@ -1,1 +1,1 @@
-Login, session and role based navigation. Owner: Hồ Văn Thông Đạt. Tasks M5-02; coordinate JWT response shape with M1-03.
+Owner: Hồ Văn Thông Đạt. Nền mẫu đã có login/register thật, AuthProvider, RequireAuth và AccountPage, khớp M1-03. Xem `frontend/README.md` và `docs/auth.md` để tiếp tục M5-02. Mọi HTTP call nằm trong `api.ts`; không tự lưu role/mật khẩu hoặc tạo provider thứ hai.
