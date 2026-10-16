@@ -5,3 +5,8 @@ app:
   demo-seed:
     enabled: ${DEMO_SEED_ENABLED:true}
     password: ${DEMO_SEED_PASSWORD:HotelPmsDemo123!}
+  # Pricing fallback: cho phép stub port khi Room/Loyalty chưa có adapter.
+  # Mặc định global là false (fail-fast ở production); dev profile bật để
+  # giữ trải nghiệm phát triển hiện tại. Tắt bằng PRICING_USE_STUB_PORTS=false.
+  pricing:
+    use-stub-ports: ${PRICING_USE_STUB_PORTS:true}
