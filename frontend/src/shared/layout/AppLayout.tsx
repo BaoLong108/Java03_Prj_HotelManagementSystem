@@ -6,13 +6,14 @@ import { Icon } from '../ui/Icon'
 import type { IconName } from '../ui/Icon'
 
 const primaryNav: { to: string; label: string; icon: IconName }[] = [
-  { to: '/', label: 'Tổng quan', icon: 'home' },
+  { to: '/', label: 'Trang chủ', icon: 'home' },
   { to: '/rooms', label: 'Loại phòng', icon: 'bed' },
-  { to: '/booking', label: 'Đặt phòng', icon: 'calendar' },
+  { to: '/booking', label: 'Tìm phòng', icon: 'calendar' },
 ]
 const titles: Record<string, string> = {
-  '/': 'Tổng quan', '/rooms': 'Loại phòng', '/booking': 'Đặt phòng', '/login': 'Đăng nhập',
+  '/': 'Trang chủ', '/rooms': 'Loại phòng', '/booking': 'Tìm phòng', '/login': 'Đăng nhập',
   '/register': 'Tạo tài khoản', '/account': 'Tài khoản', '/staff': 'Vận hành', '/admin': 'Quản trị', '/ui-kit': 'Mẫu giao diện',
+  '/staff/calendar': 'Lịch phòng', '/staff/bookings': 'Danh sách đặt phòng', '/403': 'Không đủ quyền',
 }
 
 export function AppLayout() {
@@ -36,7 +37,7 @@ export function AppLayout() {
 
   useEffect(() => {
     setMenuOpen(false)
-    document.title = `${titles[location.pathname] ?? 'Không tìm thấy trang'} · Hotel PMS`
+    document.title = `${titles[location.pathname] ?? 'Không tìm thấy trang'} · Hotel PMS Mini`
     window.scrollTo(0, 0)
   }, [location.pathname])
   useEffect(() => {
@@ -64,6 +65,10 @@ export function AppLayout() {
         {primaryNav.map((item) => <NavLink key={item.to} to={item.to} end={item.to === '/'}>
           <Icon name={item.icon} />{item.label}<Icon name="chevron" size={15} /></NavLink>)}
         {auth.user && <NavLink to="/account"><Icon name="user" />Tài khoản<Icon name="chevron" size={15} /></NavLink>}
+        {!auth.user && auth.status !== 'loading' && <>
+          <NavLink to="/login"><Icon name="key" />Đăng nhập</NavLink>
+          <NavLink to="/register"><Icon name="user" />Đăng ký</NavLink>
+        </>}
         {isStaff && <><p className="nav-caption">QUẢN LÝ</p><NavLink to="/staff"><Icon name="calendar" />Vận hành<Icon name="chevron" size={15} /></NavLink></>}
         {isAdmin && <NavLink to="/admin"><Icon name="shield" />Quản trị<Icon name="chevron" size={15} /></NavLink>}
       </nav>
@@ -74,13 +79,16 @@ export function AppLayout() {
     <div className="workspace" inert={menuOpen}>
       <header className="topbar"><div className="breadcrumb"><button ref={menuButton} className="icon-button mobile-only"
         aria-label="Mở menu" aria-controls="navigation-sidebar" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}><Icon name="menu" /></button>
-        <span className="breadcrumb-root">Không gian làm việc</span><span className="breadcrumb-slash">/</span><strong>{titles[location.pathname] ?? '404'}</strong></div>
+        <Link to="/" className="topbar-brand">Hotel PMS Mini</Link><span className="breadcrumb-slash">/</span><strong className="breadcrumb-page">{titles[location.pathname] ?? '404'}</strong></div>
         {auth.user ? <div className="topbar-account"><Link to="/account" className="account-link">
           <span className="avatar">{auth.user.fullName.slice(0, 1).toLocaleUpperCase('vi')}</span>
           <span className="account-label"><strong>{auth.user.fullName}</strong><small>{auth.user.roles.map((role) => roleLabels[role]).join(' · ')}</small></span></Link>
-          <button className="icon-button" title="Đăng xuất" aria-label="Đăng xuất" onClick={() => startTransition(() => { auth.logout(); navigate('/', { replace: true }) })}><Icon name="logout" /></button></div>
+          <button className="button button--secondary button--small" onClick={() => startTransition(() => { auth.logout(); navigate('/', { replace: true }) })}><Icon name="logout" size={16} />Đăng xuất</button></div>
           : auth.status === 'loading' ? <span className="muted small">Đang xác thực…</span>
-          : <Link className="button button--secondary button--small" to="/login"><Icon name="user" size={16} />Đăng nhập</Link>}
+          : <nav className="topbar-auth" aria-label="Tài khoản">
+            <Link className="button button--secondary button--small" to="/login">Đăng nhập</Link>
+            <Link className="button button--primary button--small" to="/register">Đăng ký</Link>
+          </nav>}
       </header>
       <main id="main-content" className="main-content" tabIndex={-1}><Outlet /></main>
       <footer className="workspace-footer"><span>Hotel PMS Mini · Nhóm 03</span><span>Đơn giản hơn mỗi ngày.</span></footer>

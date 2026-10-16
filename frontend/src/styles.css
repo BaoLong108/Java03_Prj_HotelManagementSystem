@@ -298,3 +298,27 @@ td[colspan] { white-space: normal; border: 0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* M5-01: extend the existing shell for guest/staff navigation and narrow screens. */
+.topbar-brand { color: var(--primary); font-size: 16px; font-weight: 700; white-space: nowrap; }
+.topbar-auth { display: flex; gap: 8px; flex-shrink: 0; }
+.topbar-account > button { flex-shrink: 0; }
+.breadcrumb { min-width: 0; }
+.breadcrumb-page { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.staff-nav { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 26px; }
+.staff-nav a { padding: 12px 16px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); }
+.staff-nav a.active { background: var(--primary); color: #fff; }
+.auth-story, .auth-form-panel { min-width: 0; }
+.alert > div, .field-error, .profile-heading h2 { overflow-wrap: anywhere; }
+@media (max-width: 620px) {
+  .topbar { height: auto; min-height: 64px; padding: 12px 16px; flex-wrap: wrap; gap: 10px; }
+  .breadcrumb { width: 100%; }
+  .breadcrumb-page { margin-left: auto; font-size: 11px; }
+  .topbar-auth, .topbar-account { margin-left: auto; }
+  .account-label { display: block; max-width: 155px; }
+  .account-label small { display: none; }
+  .input-wrap input { font-size: 16px; }
+  .sidebar { padding-top: 18px; }
+  .sidebar-note { display: none; }
+  .property-switch { margin: 20px 0; }
+}
