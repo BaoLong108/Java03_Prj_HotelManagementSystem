@@ -41,10 +41,15 @@ public class ApiExceptionHandler {
     @ExceptionHandler(DataIntegrityViolationException.class)
     ResponseEntity<ApiError> dataConflict(DataIntegrityViolationException exception) {
         for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
-            if (cause instanceof org.hibernate.exception.ConstraintViolationException constraint
-                    && "uq_app_users_email_lower".equals(constraint.getConstraintName())) {
-                return ResponseEntity.status(HttpStatus.CONFLICT)
-                        .body(new ApiError("EMAIL_ALREADY_EXISTS", "Email đã được đăng ký"));
+            if (cause instanceof org.hibernate.exception.ConstraintViolationException constraint) {
+                if ("uq_app_users_email_lower".equals(constraint.getConstraintName())) {
+                    return ResponseEntity.status(HttpStatus.CONFLICT)
+                            .body(new ApiError("EMAIL_ALREADY_EXISTS", "Email đã được đăng ký"));
+                }
+                if ("ex_bookings_room_overlap".equals(constraint.getConstraintName())) {
+                    return ResponseEntity.status(HttpStatus.CONFLICT)
+                            .body(new ApiError("ROOM_NOT_AVAILABLE", "Phòng đã có người đặt trong khoảng thời gian đã chọn"));
+                }
             }
         }
         return ResponseEntity.status(HttpStatus.CONFLICT)

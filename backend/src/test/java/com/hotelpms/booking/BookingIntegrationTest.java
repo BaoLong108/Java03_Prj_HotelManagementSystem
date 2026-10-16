@@ -1,0 +1,342 @@
+package com.hotelpms.booking;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.hotelpms.auth.entity.RoleCode;
+import com.hotelpms.auth.entity.User;
+import com.hotelpms.auth.repository.CustomerProfileRepository;
+import com.hotelpms.auth.repository.UserRepository;
+import com.hotelpms.booking.dto.CreateBookingRequest;
+import com.hotelpms.booking.entity.BookingStatus;
+import com.hotelpms.booking.repository.BookingRepository;
+import io.zonky.test.db.postgres.embedded.EmbeddedPostgres;
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.TestContext;
+import org.springframework.test.context.TestExecutionListeners;
+import org.springframework.test.context.support.AbstractTestExecutionListener;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+
+@ActiveProfiles("dev")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+@TestExecutionListeners(listeners = BookingIntegrationTest.PostgresCleanupListener.class,
+        mergeMode = TestExecutionListeners.MergeMode.MERGE_WITH_DEFAULTS)
+class BookingIntegrationTest {
+
+    private static final String PASSWORD = "TestDemo123!";
+    private static final HttpClient HTTP = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10)).build();
+    private static EmbeddedPostgres postgres;
+
+    @DynamicPropertySource
+    static void database(DynamicPropertyRegistry properties) throws IOException {
+        String externalUrl = System.getenv("TEST_DB_URL");
+        if (externalUrl == null || externalUrl.isBlank()) {
+            postgres = EmbeddedPostgres.builder().setPort(0).start();
+            properties.add("spring.datasource.url", () -> postgres.getJdbcUrl("postgres", "postgres"));
+            properties.add("spring.datasource.username", () -> "postgres");
+            properties.add("spring.datasource.password", () -> "postgres");
+        } else {
+            properties.add("spring.datasource.url", () -> externalUrl);
+            properties.add("spring.datasource.username", () -> System.getenv("TEST_DB_USER"));
+            properties.add("spring.datasource.password", () -> System.getenv("TEST_DB_PASSWORD"));
+        }
+        properties.add("app.jwt.secret", () -> "integration-test-signing-key-at-least-thirty-two-characters");
+        properties.add("app.jwt.access-token-ttl-seconds", () -> "3600");
+        properties.add("app.demo-seed.enabled", () -> "true");
+        properties.add("app.demo-seed.password", () -> PASSWORD);
+    }
+
+    public static class PostgresCleanupListener extends AbstractTestExecutionListener {
+        @Override
+        public int getOrder() { return 1000; }
+
+        @Override
+        public void afterTestClass(TestContext context) throws IOException {
+            if (postgres != null) postgres.close();
+        }
+    }
+
+    @Value("${local.server.port}") private int port;
+    @Autowired private ObjectMapper json;
+    @Autowired private JdbcTemplate jdbc;
+    @Autowired private BookingRepository bookingRepository;
+    @Autowired private UserRepository userRepository;
+    @Autowired private CustomerProfileRepository profileRepository;
+
+    private Long roomTypeId;
+    private Long physicalRoomId101;
+    private Long physicalRoomId102;
+
+    @BeforeEach
+    void setUp() {
+        bookingRepository.deleteAll();
+
+        roomTypeId = 1L;
+        physicalRoomId101 = 101L;
+        physicalRoomId102 = 102L;
+
+        jdbc.update("""
+            INSERT INTO room_types (id, code, name, description, max_occupancy, base_price_per_night, is_active)
+            VALUES (?, 'DLX', 'Deluxe Room', 'Room description', 2, 1200000.00, true)
+            ON CONFLICT (id) DO UPDATE SET base_price_per_night = 1200000.00, is_active = true
+        """, roomTypeId);
+
+        jdbc.update("""
+            INSERT INTO physical_rooms (id, room_type_id, room_number, floor_number, is_active)
+            VALUES (?, ?, '101', 1, true)
+            ON CONFLICT (id) DO UPDATE SET is_active = true
+        """, physicalRoomId101, roomTypeId);
+
+        jdbc.update("""
+            INSERT INTO physical_rooms (id, room_type_id, room_number, floor_number, is_active)
+            VALUES (?, ?, '102', 1, true)
+            ON CONFLICT (id) DO UPDATE SET is_active = true
+        """, physicalRoomId102, roomTypeId);
+
+        // Clear any room blocks
+        jdbc.update("DELETE FROM room_blocks");
+    }
+
+    @Test
+    void testCreateBooking_SuccessAndRetrieve() throws Exception {
+        String token = login("customer@hotel-pms.test", PASSWORD);
+
+        Instant startAt = Instant.now().plus(2, ChronoUnit.DAYS).truncatedTo(ChronoUnit.HOURS);
+        Instant endAt = startAt.plus(2, ChronoUnit.DAYS).minus(2, ChronoUnit.HOURS); // 2 nights
+
+        CreateBookingRequest request = new CreateBookingRequest(roomTypeId, (short) 2, startAt, endAt);
+
+        HttpResponse<String> response = post("/api/v1/bookings", request, token);
+        assertThat(response.statusCode()).isEqualTo(201);
+
+        JsonNode body = tree(response);
+        String bookingCode = body.path("bookingCode").asText();
+        assertThat(bookingCode).startsWith("BK");
+        assertThat(body.path("status").asText()).isEqualTo(BookingStatus.PENDING_PAYMENT.name());
+        assertThat(body.path("baseAmount").asDouble()).isEqualTo(2400000.00);
+        assertThat(body.path("payableAmount").asDouble()).isEqualTo(2400000.00);
+        assertThat(body.path("discountRate").asDouble()).isEqualTo(0.0);
+
+        // Verify hold expires in ~15 minutes
+        Instant holdExpiresAt = Instant.parse(body.path("holdExpiresAt").asText());
+        assertThat(Duration.between(Instant.now(), holdExpiresAt).toMinutes()).isBetween(14L, 16L);
+
+        // Verify physical_room_id is NOT exposed in response
+        assertThat(body.has("physicalRoomId")).isFalse();
+        assertThat(body.has("physical_room_id")).isFalse();
+
+        // Retrieve by bookingCode
+        HttpResponse<String> getResponse = get("/api/v1/bookings/" + bookingCode, token);
+        assertThat(getResponse.statusCode()).isEqualTo(200);
+        assertThat(tree(getResponse).path("bookingCode").asText()).isEqualTo(bookingCode);
+
+        // Retrieve customer bookings list
+        HttpResponse<String> listResponse = get("/api/v1/bookings", token);
+        assertThat(listResponse.statusCode()).isEqualTo(200);
+        JsonNode listNode = tree(listResponse);
+        assertThat(listNode.isArray()).isTrue();
+        assertThat(listNode.size()).isEqualTo(1);
+        assertThat(listNode.get(0).path("bookingCode").asText()).isEqualTo(bookingCode);
+    }
+
+    @Test
+    void testCreateBooking_VIPTierDiscount() throws Exception {
+        User user = userRepository.findByEmailIgnoreCase("customer@hotel-pms.test").orElseThrow();
+        jdbc.update("UPDATE customer_profiles SET tier_code = 'VIP' WHERE user_id = ?", user.getId());
+
+        String token = login("customer@hotel-pms.test", PASSWORD);
+
+        Instant startAt = Instant.now().plus(2, ChronoUnit.DAYS).truncatedTo(ChronoUnit.HOURS);
+        Instant endAt = startAt.plus(2, ChronoUnit.DAYS).minus(2, ChronoUnit.HOURS); // 2 nights
+
+        CreateBookingRequest request = new CreateBookingRequest(roomTypeId, (short) 1, startAt, endAt);
+
+        HttpResponse<String> response = post("/api/v1/bookings", request, token);
+        assertThat(response.statusCode()).isEqualTo(201);
+
+        JsonNode body = tree(response);
+        assertThat(body.path("baseAmount").asDouble()).isEqualTo(2400000.00);
+        assertThat(body.path("discountRate").asDouble()).isEqualTo(0.1000);
+        assertThat(body.path("discountAmount").asDouble()).isEqualTo(240000.00);
+        assertThat(body.path("payableAmount").asDouble()).isEqualTo(2160000.00);
+
+        // Reset tier back to STANDARD
+        jdbc.update("UPDATE customer_profiles SET tier_code = 'STANDARD' WHERE user_id = ?", user.getId());
+    }
+
+    @Test
+    void testCreateBooking_RoomNotAvailable_WhenAllRoomsOccupied() throws Exception {
+        String token = login("customer@hotel-pms.test", PASSWORD);
+
+        Instant startAt = Instant.now().plus(5, ChronoUnit.DAYS).truncatedTo(ChronoUnit.HOURS);
+        Instant endAt = startAt.plus(2, ChronoUnit.DAYS).minus(2, ChronoUnit.HOURS);
+
+        CreateBookingRequest request = new CreateBookingRequest(roomTypeId, (short) 1, startAt, endAt);
+
+        // 1st booking -> room 101 allocated
+        HttpResponse<String> res1 = post("/api/v1/bookings", request, token);
+        assertThat(res1.statusCode()).isEqualTo(201);
+
+        // 2nd booking -> room 102 allocated
+        HttpResponse<String> res2 = post("/api/v1/bookings", request, token);
+        assertThat(res2.statusCode()).isEqualTo(201);
+
+        // 3rd booking -> No physical room left!
+        HttpResponse<String> res3 = post("/api/v1/bookings", request, token);
+        assertThat(res3.statusCode()).isEqualTo(409);
+        assertThat(tree(res3).path("code").asText()).isEqualTo("ROOM_NOT_AVAILABLE");
+    }
+
+    @Test
+    void testCreateBooking_RoomNotAvailable_WhenRoomBlocked() throws Exception {
+        String token = login("customer@hotel-pms.test", PASSWORD);
+        User staff = userRepository.findByEmailIgnoreCase("staff@hotel-pms.test").orElseThrow();
+
+        Instant startAt = Instant.now().plus(10, ChronoUnit.DAYS).truncatedTo(ChronoUnit.HOURS);
+        Instant endAt = startAt.plus(2, ChronoUnit.DAYS).minus(2, ChronoUnit.HOURS);
+
+        // Block room 102 during this period
+        jdbc.update("""
+            INSERT INTO room_blocks (id, physical_room_id, start_at, end_at, reason, created_by_user_id)
+            VALUES (9001, ?, ?, ?, 'Maintenance', ?)
+        """, physicalRoomId102, java.sql.Timestamp.from(startAt), java.sql.Timestamp.from(endAt), staff.getId());
+
+        CreateBookingRequest request = new CreateBookingRequest(roomTypeId, (short) 1, startAt, endAt);
+
+        // 1st booking -> gets room 101
+        HttpResponse<String> res1 = post("/api/v1/bookings", request, token);
+        assertThat(res1.statusCode()).isEqualTo(201);
+
+        // 2nd booking -> room 102 is blocked, none left -> 409
+        HttpResponse<String> res2 = post("/api/v1/bookings", request, token);
+        assertThat(res2.statusCode()).isEqualTo(409);
+        assertThat(tree(res2).path("code").asText()).isEqualTo("ROOM_NOT_AVAILABLE");
+    }
+
+    @Test
+    void testAccessControl_OtherCustomerCannotViewBooking() throws Exception {
+        // Register customer 2
+        String customer2Email = "customer2-" + UUID.randomUUID() + "@hotel-pms.test";
+        HttpResponse<String> regRes = post("/api/v1/auth/register", Map.of(
+                "email", customer2Email,
+                "password", PASSWORD,
+                "fullName", "Second Customer"
+        ), null);
+        assertThat(regRes.statusCode()).isEqualTo(201);
+        String token2 = tree(regRes).path("accessToken").asText();
+
+        // Customer 1 books
+        String token1 = login("customer@hotel-pms.test", PASSWORD);
+        Instant startAt = Instant.now().plus(15, ChronoUnit.DAYS).truncatedTo(ChronoUnit.HOURS);
+        Instant endAt = startAt.plus(2, ChronoUnit.DAYS).minus(2, ChronoUnit.HOURS);
+
+        HttpResponse<String> bookRes = post("/api/v1/bookings", new CreateBookingRequest(roomTypeId, (short) 1, startAt, endAt), token1);
+        assertThat(bookRes.statusCode()).isEqualTo(201);
+        String bookingCode = tree(bookRes).path("bookingCode").asText();
+
+        // Customer 2 attempts to view Customer 1's booking -> 403 Forbidden
+        HttpResponse<String> forbiddenRes = get("/api/v1/bookings/" + bookingCode, token2);
+        assertThat(forbiddenRes.statusCode()).isEqualTo(403);
+
+        // Staff views Customer 1's booking -> 200 OK
+        String staffToken = login("staff@hotel-pms.test", PASSWORD);
+        HttpResponse<String> staffRes = get("/api/v1/bookings/" + bookingCode, staffToken);
+        assertThat(staffRes.statusCode()).isEqualTo(200);
+    }
+
+    @Test
+    void testConcurrentBooking_OnlyOneSucceedsWhenSingleRoomAvailable() throws Exception {
+        // Make room 102 inactive, so ONLY room 101 is available
+        jdbc.update("UPDATE physical_rooms SET is_active = false WHERE id = ?", physicalRoomId102);
+
+        String token = login("customer@hotel-pms.test", PASSWORD);
+        Instant startAt = Instant.now().plus(20, ChronoUnit.DAYS).truncatedTo(ChronoUnit.HOURS);
+        Instant endAt = startAt.plus(2, ChronoUnit.DAYS).minus(2, ChronoUnit.HOURS);
+
+        CreateBookingRequest request = new CreateBookingRequest(roomTypeId, (short) 1, startAt, endAt);
+
+        // Fire 2 concurrent requests
+        CompletableFuture<HttpResponse<String>> call1 = CompletableFuture.supplyAsync(() -> {
+            try {
+                return post("/api/v1/bookings", request, token);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+
+        CompletableFuture<HttpResponse<String>> call2 = CompletableFuture.supplyAsync(() -> {
+            try {
+                return post("/api/v1/bookings", request, token);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+
+        HttpResponse<String> r1 = call1.join();
+        HttpResponse<String> r2 = call2.join();
+
+        List<Integer> statuses = List.of(r1.statusCode(), r2.statusCode());
+        assertThat(statuses).containsExactlyInAnyOrder(201, 409);
+
+        // Ensure database has exactly 1 booking
+        assertThat(bookingRepository.count()).isEqualTo(1);
+    }
+
+    // Helper methods
+
+    private String login(String email, String password) throws Exception {
+        HttpResponse<String> res = post("/api/v1/auth/login", Map.of("email", email, "password", password), null);
+        assertThat(res.statusCode()).isEqualTo(200);
+        return tree(res).path("accessToken").asText();
+    }
+
+    private JsonNode tree(HttpResponse<String> response) {
+        return json.readTree(response.body());
+    }
+
+    private URI uri(String path) {
+        return URI.create("http://localhost:" + port + path);
+    }
+
+    private HttpResponse<String> post(String path, Object body, String token) throws Exception {
+        var builder = HttpRequest.newBuilder(uri(path)).timeout(Duration.ofSeconds(30))
+                .header("Content-Type", "application/json");
+        if (token != null) {
+            builder.header("Authorization", "Bearer " + token);
+        }
+        builder.POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body)));
+        return HTTP.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+    }
+
+    private HttpResponse<String> get(String path, String token) throws Exception {
+        var builder = HttpRequest.newBuilder(uri(path)).timeout(Duration.ofSeconds(30)).GET();
+        if (token != null) {
+            builder.header("Authorization", "Bearer " + token);
+        }
+        return HTTP.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+    }
+}
