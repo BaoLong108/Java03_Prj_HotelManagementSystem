@@ -13,8 +13,8 @@ import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
- * Cấu hình bảo mật tạm thời dùng HTTP Basic Auth cho admin endpoints.
- * TODO M1-03: thay thế bằng JWT filter khi auth module hoàn thiện.
+ * Cau hinh bao mat tam thoi dung HTTP Basic Auth cho admin endpoints.
+ * TODO M1-03: thay the bang JWT filter khi auth module hoan thien.
  */
 @Configuration
 public class SecurityConfig {
@@ -26,13 +26,9 @@ public class SecurityConfig {
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(basic -> basic.realmName("Hotel PMS"))
                 .authorizeHttpRequests(auth -> auth
-                        // Health check — public
                         .requestMatchers("/actuator/health").permitAll()
-                        // Public room listing — GET only, no auth needed
                         .requestMatchers(HttpMethod.GET, "/api/v1/rooms", "/api/v1/rooms/**").permitAll()
-                        // Admin CRUD — yêu cầu ADMIN role
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
-                        // Tất cả còn lại — từ chối
                         .anyRequest().denyAll()
                 )
                 .build();
@@ -44,8 +40,8 @@ public class SecurityConfig {
     }
 
     /**
-     * User tạm thời trong memory để test admin API.
-     * TODO M1-03: xóa bean này khi có UserDetailsService từ database.
+     * User tam thoi trong memory de test admin API.
+     * TODO M1-03: xoa bean nay khi co UserDetailsService tu database.
      */
     @Bean
     UserDetailsService userDetailsService(PasswordEncoder encoder) {
