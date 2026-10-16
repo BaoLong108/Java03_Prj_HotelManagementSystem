@@ -12,9 +12,9 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 /**
- * Phòng vật lý thực tế trong khách sạn.
- * Mỗi phòng thuộc đúng một {@link RoomType}; số phòng là duy nhất trong toàn bộ khách sạn.
- * Không lộ số phòng ra ngoài API khách hàng — chỉ dùng nội bộ khi tạo booking.
+ * PhÃ²ng váº­t lÃ½ thá»±c táº¿ trong khÃ¡ch sáº¡n.
+ * Má»—i phÃ²ng thuá»™c Ä‘Ãºng má»™t {@link RoomType}; sá»‘ phÃ²ng lÃ  duy nháº¥t trong toÃ n bá»™ khÃ¡ch sáº¡n.
+ * KhÃ´ng lá»™ sá»‘ phÃ²ng ra ngoÃ i API khÃ¡ch hÃ ng â€” chá»‰ dÃ¹ng ná»™i bá»™ khi táº¡o booking.
  */
 @Entity
 @Table(name = "physical_rooms")
@@ -25,18 +25,18 @@ public class PhysicalRoom extends AuditedEntity {
     private Long id;
 
     /**
-     * Loại phòng mà phòng này thuộc về.
-     * Không thay đổi sau khi tạo; muốn đổi loại phải deactivate và tạo phòng mới.
+     * Loáº¡i phÃ²ng mÃ  phÃ²ng nÃ y thuá»™c vá».
+     * KhÃ´ng thay Ä‘á»•i sau khi táº¡o; muá»‘n Ä‘á»•i loáº¡i pháº£i deactivate vÃ  táº¡o phÃ²ng má»›i.
      */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "room_type_id", nullable = false, updatable = false)
     private RoomType roomType;
 
-    /** Số phòng hiển thị cho nhân viên (101, 202A…). Duy nhất trong toàn khách sạn. */
+    /** Sá»‘ phÃ²ng hiá»ƒn thá»‹ cho nhÃ¢n viÃªn (101, 202Aâ€¦). Duy nháº¥t trong toÃ n khÃ¡ch sáº¡n. */
     @Column(name = "room_number", nullable = false, unique = true, length = 30)
     private String roomNumber;
 
-    /** Tầng của phòng; null nếu không áp dụng. */
+    /** Táº§ng cá»§a phÃ²ng; null náº¿u khÃ´ng Ã¡p dá»¥ng. */
     @Column(name = "floor_number")
     private Short floorNumber;
 

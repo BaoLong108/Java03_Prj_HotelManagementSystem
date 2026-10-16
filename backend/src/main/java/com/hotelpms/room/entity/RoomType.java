@@ -9,6 +9,10 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -27,9 +31,13 @@ public class RoomType extends AuditedEntity {
     private Long id;
 
     /** Mã loại phòng — duy nhất, viết hoa, ví dụ: STANDARD, DELUXE, SUITE. */
+    @NotBlank
+    @Size(max = 30)
     @Column(nullable = false, unique = true, length = 30)
     private String code;
 
+    @NotBlank
+    @Size(max = 120)
     @Column(nullable = false, length = 120)
     private String name;
 
@@ -37,10 +45,12 @@ public class RoomType extends AuditedEntity {
     private String description;
 
     /** Số khách tối đa cho loại phòng này. */
+    @Positive
     @Column(name = "max_occupancy", nullable = false)
     private short maxOccupancy;
 
     /** Giá gốc mỗi đêm tính bằng VND (snapshot tại thời điểm tạo booking). */
+    @DecimalMin("0.0")
     @Column(name = "base_price_per_night", nullable = false, precision = 15, scale = 2)
     private BigDecimal basePricePerNight;
 
@@ -75,9 +85,4 @@ public class RoomType extends AuditedEntity {
     public void setMaxOccupancy(short maxOccupancy) { this.maxOccupancy = maxOccupancy; }
     public void setBasePricePerNight(BigDecimal basePricePerNight) { this.basePricePerNight = basePricePerNight; }
     public void setActive(boolean active) { this.active = active; }
-
-    /** Đếm số phòng vật lý đang hoạt động thuộc loại này (không load collection). */
-    public long countActiveRooms() {
-        return physicalRooms.stream().filter(PhysicalRoom::isActive).count();
-    }
 }

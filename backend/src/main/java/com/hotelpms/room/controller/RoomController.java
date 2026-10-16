@@ -9,8 +9,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * API công khai cho loại phòng.
- * Khách chưa đăng nhập được phép xem — không lộ số phòng vật lý.
+ * API công khai cho loại phòng — không yêu cầu đăng nhập.
+ * Không lộ số phòng vật lý hay thông tin nội bộ.
  */
 @RestController
 @RequestMapping("/api/v1/rooms")
