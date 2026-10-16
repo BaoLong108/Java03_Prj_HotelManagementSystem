@@ -26,10 +26,6 @@ public class RoomBlockService {
 
     // ── Query ──────────────────────────────────────────────────────────────────
 
-    /**
-     * Lay cac block con hieu luc cua mot phong.
-     * Dung cho nhan vien xem lich block.
-     */
     @Transactional(readOnly = true)
     public List<RoomBlockResponse> listActiveBlocks(Long roomId) {
         requireRoom(roomId);
@@ -37,9 +33,6 @@ public class RoomBlockService {
                 .stream().map(RoomBlockResponse::from).toList();
     }
 
-    /**
-     * Lay toan bo lich su block (ca released) cua mot phong.
-     */
     @Transactional(readOnly = true)
     public List<RoomBlockResponse> listAllBlocks(Long roomId) {
         requireRoom(roomId);
@@ -47,30 +40,19 @@ public class RoomBlockService {
                 .stream().map(RoomBlockResponse::from).toList();
     }
 
-    /**
-     * Kiem tra phong co kha dung trong khoang thoi gian khong.
-     * Tra ve true neu phong KHONG bi block trong [from, to).
-     */
+    /** GET chi tiet mot block theo id. */
     @Transactional(readOnly = true)
-    public boolean isRoomAvailable(Long roomId, Instant from, Instant to) {
-        return !blocks.isRoomBlocked(roomId, from, to);
+    public RoomBlockResponse getBlock(Long blockId) {
+        return blocks.findByIdWithRoom(blockId)
+                .map(RoomBlockResponse::from)
+                .orElseThrow(() -> new ApiException(
+                        HttpStatus.NOT_FOUND, "BLOCK_NOT_FOUND", "Block khong ton tai"));
     }
 
     // ── Command ────────────────────────────────────────────────────────────────
 
-    /**
-     * Tao block moi cho phong.
-     * Kiem tra:
-     *   - Phong phai ton tai va dang active
-     *   - endAt phai sau startAt
-     *   - Khong co block nao overlap trong khoang thoi gian do (DB dam bao them qua EXCLUDE constraint)
-     *
-     * @param req     thong tin block
-     * @param staffId id nhan vien tao block
-     */
     @Transactional
     public RoomBlockResponse createBlock(RoomBlockRequest req, Long staffId) {
-        // Validate thoi gian
         if (!req.endAt().isAfter(req.startAt())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_BLOCK_PERIOD",
                     "Thoi gian ket thuc phai sau thoi gian bat dau");
@@ -81,7 +63,7 @@ public class RoomBlockService {
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND,
                         "PHYSICAL_ROOM_NOT_FOUND", "Phong khong ton tai hoac da bi an"));
 
-        // Kiem tra overlap truoc khi insert (DB cung co EXCLUDE constraint lam net san)
+        // findOverlapping tra ve list kem thong tin conflict ro rang cho client
         List<RoomBlock> overlapping = blocks.findOverlapping(
                 req.physicalRoomId(), req.startAt(), req.endAt());
         if (!overlapping.isEmpty()) {
@@ -97,15 +79,9 @@ public class RoomBlockService {
         return RoomBlockResponse.from(block);
     }
 
-    /**
-     * Giai phong phong (mo block som hon ke hoach).
-     *
-     * @param blockId id block can giai phong
-     * @param staffId id nhan vien thuc hien
-     */
     @Transactional
     public RoomBlockResponse releaseBlock(Long blockId, Long staffId) {
-        RoomBlock block = blocks.findById(blockId)
+        RoomBlock block = blocks.findByIdWithRoom(blockId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND,
                         "BLOCK_NOT_FOUND", "Block khong ton tai"));
 
@@ -119,13 +95,16 @@ public class RoomBlockService {
         return RoomBlockResponse.from(block);
     }
 
-    // ── Internal helper ────────────────────────────────────────────────────────
+    // ── Internal: dung boi booking service ────────────────────────────────────
 
-    /** Dung boi booking service de kiem tra truoc khi assign phong. */
+    /**
+     * Nem ApiException neu phong bi block trong khoang thoi gian.
+     * Chi goi 1 query duy nhat (findOverlapping) -- khong con race condition.
+     */
     @Transactional(readOnly = true)
     public void assertRoomNotBlocked(Long roomId, Instant from, Instant to) {
-        if (blocks.isRoomBlocked(roomId, from, to)) {
-            List<RoomBlock> conflicts = blocks.findOverlapping(roomId, from, to);
+        List<RoomBlock> conflicts = blocks.findOverlapping(roomId, from, to);
+        if (!conflicts.isEmpty()) {
             RoomBlock first = conflicts.get(0);
             throw new ApiException(HttpStatus.CONFLICT, "ROOM_BLOCKED",
                     String.format("Phong bi block tu %s den %s: %s",

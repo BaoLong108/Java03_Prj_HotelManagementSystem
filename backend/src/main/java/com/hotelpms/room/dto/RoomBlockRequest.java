@@ -1,5 +1,6 @@
 package com.hotelpms.room.dto;
 
+import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
@@ -14,6 +15,7 @@ public record RoomBlockRequest(
         Long physicalRoomId,
 
         @NotNull(message = "Thoi gian bat dau khong duoc null")
+        @Future(message = "Thoi gian bat dau phai o tuong lai")
         Instant startAt,
 
         @NotNull(message = "Thoi gian ket thuc khong duoc null")

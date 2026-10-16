@@ -1,9 +1,10 @@
 package com.hotelpms.room.service;
 
-import com.hotelpms.room.dto.PhysicalRoomRequest;
+import com.hotelpms.room.dto.CreatePhysicalRoomRequest;
 import com.hotelpms.room.dto.PhysicalRoomResponse;
 import com.hotelpms.room.dto.RoomTypeRequest;
 import com.hotelpms.room.dto.RoomTypeResponse;
+import com.hotelpms.room.dto.UpdatePhysicalRoomRequest;
 import com.hotelpms.room.entity.PhysicalRoom;
 import com.hotelpms.room.entity.RoomType;
 import com.hotelpms.room.repository.PhysicalRoomRepository;
@@ -25,36 +26,32 @@ public class RoomService {
         this.physicalRooms = physicalRooms;
     }
 
-    // ─── PUBLIC API ────────────────────────────────────────────────────────────
+    // ── Public API ─────────────────────────────────────────────────────────────
 
-    /** Danh sách loại phòng active — dùng cho trang chọn phòng của khách. */
     @Transactional(readOnly = true)
     public List<RoomTypeResponse> listActiveRoomTypes() {
         return roomTypes.findAllActiveWithRoomCount();
     }
 
-    /** Chi tiết một loại phòng active theo id. */
     @Transactional(readOnly = true)
     public RoomTypeResponse getRoomType(Long id) {
         return roomTypes.findActiveByIdWithRoomCount(id)
                 .orElseThrow(() -> new ApiException(
-                        HttpStatus.NOT_FOUND, "ROOM_TYPE_NOT_FOUND", "Loại phòng không tồn tại"));
+                        HttpStatus.NOT_FOUND, "ROOM_TYPE_NOT_FOUND", "Loai phong khong ton tai"));
     }
 
-    // ─── ADMIN: ROOM TYPE ──────────────────────────────────────────────────────
+    // ── Admin: RoomType ────────────────────────────────────────────────────────
 
-    /** Tất cả loại phòng (kể cả inactive) cho màn hình quản trị. */
     @Transactional(readOnly = true)
     public List<RoomTypeResponse> adminListAllRoomTypes() {
         return roomTypes.findAllWithRoomCount();
     }
 
-    /** Tạo loại phòng mới. Mã code phải unique (case-insensitive). */
     @Transactional
     public RoomTypeResponse createRoomType(RoomTypeRequest req) {
         if (roomTypes.existsByCodeIgnoreCase(req.code())) {
             throw new ApiException(HttpStatus.CONFLICT, "ROOM_TYPE_CODE_DUPLICATE",
-                    "Mã loại phòng '" + req.code() + "' đã tồn tại");
+                    "Ma loai phong '" + req.code() + "' da ton tai");
         }
         RoomType rt = new RoomType(
                 req.code().toUpperCase().strip(),
@@ -64,77 +61,77 @@ public class RoomService {
                 req.basePricePerNight()
         );
         roomTypes.save(rt);
-        return roomTypes.findActiveByIdWithRoomCount(rt.getId())
-                .orElseThrow();
+        // Dung findByIdWithRoomCount (ke ca inactive) thay vi findActiveByIdWithRoomCount
+        // vi RoomType moi tao co the chua duoc flush vao query active
+        return roomTypes.findByIdWithRoomCount(rt.getId()).orElseThrow();
     }
 
-    /** Cập nhật loại phòng — không cho đổi code sau khi tạo. */
     @Transactional
     public RoomTypeResponse updateRoomType(Long id, RoomTypeRequest req) {
         RoomType rt = roomTypes.findById(id)
                 .orElseThrow(() -> new ApiException(
-                        HttpStatus.NOT_FOUND, "ROOM_TYPE_NOT_FOUND", "Loại phòng không tồn tại"));
+                        HttpStatus.NOT_FOUND, "ROOM_TYPE_NOT_FOUND", "Loai phong khong ton tai"));
 
-        // Nếu code thay đổi thì kiểm tra trùng
-        if (!rt.getCode().equalsIgnoreCase(req.code()) && roomTypes.existsByCodeIgnoreCase(req.code())) {
+        if (!rt.getCode().equalsIgnoreCase(req.code())
+                && roomTypes.existsByCodeIgnoreCase(req.code())) {
             throw new ApiException(HttpStatus.CONFLICT, "ROOM_TYPE_CODE_DUPLICATE",
-                    "Mã loại phòng '" + req.code() + "' đã tồn tại");
+                    "Ma loai phong '" + req.code() + "' da ton tai");
         }
 
         rt.setName(req.name().strip());
         rt.setDescription(req.description());
         rt.setMaxOccupancy(req.maxOccupancy());
         rt.setBasePricePerNight(req.basePricePerNight());
-        roomTypes.save(rt);
-        return roomTypes.findAllWithRoomCount().stream()
-                .filter(r -> r.id().equals(id))
-                .findFirst().orElseThrow();
+        roomTypes.saveAndFlush(rt); // flush de JPQL query ben duoi thay du lieu moi nhat
+        return roomTypes.findByIdWithRoomCount(id).orElseThrow();
     }
 
-    /**
-     * Ẩn loại phòng (soft-delete: is_active = false).
-     * Không cho ẩn nếu còn phòng vật lý active thuộc loại này.
-     */
     @Transactional
     public void deactivateRoomType(Long id) {
         RoomType rt = roomTypes.findById(id)
                 .orElseThrow(() -> new ApiException(
-                        HttpStatus.NOT_FOUND, "ROOM_TYPE_NOT_FOUND", "Loại phòng không tồn tại"));
+                        HttpStatus.NOT_FOUND, "ROOM_TYPE_NOT_FOUND", "Loai phong khong ton tai"));
 
-        long activeCount = physicalRooms
-                .findAllByRoomTypeIdAndActiveTrueOrderByRoomNumberAsc(id).size();
+        // Dung COUNT query thay .size() de khong load ca list vao memory
+        long activeCount = physicalRooms.countByRoomTypeIdAndActiveTrue(id);
         if (activeCount > 0) {
             throw new ApiException(HttpStatus.CONFLICT, "ROOM_TYPE_HAS_ACTIVE_ROOMS",
-                    "Không thể ẩn loại phòng đang có " + activeCount + " phòng vật lý hoạt động");
+                    "Khong the an loai phong dang co " + activeCount + " phong vat ly hoat dong");
         }
         rt.setActive(false);
         roomTypes.save(rt);
     }
 
-    // ─── ADMIN: PHYSICAL ROOM ─────────────────────────────────────────────────
+    // ── Admin: PhysicalRoom ────────────────────────────────────────────────────
 
-    /** Danh sách tất cả phòng vật lý thuộc một loại phòng. */
     @Transactional(readOnly = true)
     public List<PhysicalRoomResponse> listPhysicalRooms(Long roomTypeId) {
         roomTypes.findById(roomTypeId)
                 .orElseThrow(() -> new ApiException(
-                        HttpStatus.NOT_FOUND, "ROOM_TYPE_NOT_FOUND", "Loại phòng không tồn tại"));
+                        HttpStatus.NOT_FOUND, "ROOM_TYPE_NOT_FOUND", "Loai phong khong ton tai"));
         return physicalRooms.findAllByRoomTypeIdOrderByRoomNumberAsc(roomTypeId)
                 .stream().map(PhysicalRoomResponse::from).toList();
     }
 
-    /** Tạo phòng vật lý mới. Số phòng phải unique toàn khách sạn. */
+    @Transactional(readOnly = true)
+    public PhysicalRoomResponse getPhysicalRoom(Long id) {
+        PhysicalRoom room = physicalRooms.findById(id)
+                .orElseThrow(() -> new ApiException(
+                        HttpStatus.NOT_FOUND, "PHYSICAL_ROOM_NOT_FOUND", "Phong khong ton tai"));
+        return PhysicalRoomResponse.from(room);
+    }
+
     @Transactional
-    public PhysicalRoomResponse createPhysicalRoom(PhysicalRoomRequest req) {
+    public PhysicalRoomResponse createPhysicalRoom(CreatePhysicalRoomRequest req) {
         RoomType rt = roomTypes.findById(req.roomTypeId())
                 .filter(RoomType::isActive)
                 .orElseThrow(() -> new ApiException(
                         HttpStatus.NOT_FOUND, "ROOM_TYPE_NOT_FOUND",
-                        "Loại phòng không tồn tại hoặc đã bị ẩn"));
+                        "Loai phong khong ton tai hoac da bi an"));
 
         if (physicalRooms.existsByRoomNumberIgnoreCase(req.roomNumber())) {
             throw new ApiException(HttpStatus.CONFLICT, "ROOM_NUMBER_DUPLICATE",
-                    "Số phòng '" + req.roomNumber() + "' đã tồn tại");
+                    "So phong '" + req.roomNumber() + "' da ton tai");
         }
 
         PhysicalRoom room = new PhysicalRoom(rt, req.roomNumber().strip(), req.floorNumber());
@@ -142,32 +139,35 @@ public class RoomService {
         return PhysicalRoomResponse.from(room);
     }
 
-    /** Cập nhật thông tin phòng vật lý — không cho đổi roomType. */
     @Transactional
-    public PhysicalRoomResponse updatePhysicalRoom(Long id, PhysicalRoomRequest req) {
+    public PhysicalRoomResponse updatePhysicalRoom(Long id, UpdatePhysicalRoomRequest req) {
         PhysicalRoom room = physicalRooms.findById(id)
                 .orElseThrow(() -> new ApiException(
-                        HttpStatus.NOT_FOUND, "PHYSICAL_ROOM_NOT_FOUND", "Phòng không tồn tại"));
+                        HttpStatus.NOT_FOUND, "PHYSICAL_ROOM_NOT_FOUND", "Phong khong ton tai"));
 
         if (physicalRooms.existsByRoomNumberIgnoreCaseAndIdNot(req.roomNumber(), id)) {
             throw new ApiException(HttpStatus.CONFLICT, "ROOM_NUMBER_DUPLICATE",
-                    "Số phòng '" + req.roomNumber() + "' đã tồn tại");
+                    "So phong '" + req.roomNumber() + "' da ton tai");
         }
 
+        room.setRoomNumber(req.roomNumber().strip());
         room.setFloorNumber(req.floorNumber());
         physicalRooms.save(room);
         return PhysicalRoomResponse.from(room);
     }
 
-    /**
-     * Ẩn phòng vật lý (soft-delete: is_active = false).
-     * Không xóa cứng để bảo toàn lịch sử booking.
-     */
     @Transactional
     public void deactivatePhysicalRoom(Long id) {
         PhysicalRoom room = physicalRooms.findById(id)
                 .orElseThrow(() -> new ApiException(
-                        HttpStatus.NOT_FOUND, "PHYSICAL_ROOM_NOT_FOUND", "Phòng không tồn tại"));
+                        HttpStatus.NOT_FOUND, "PHYSICAL_ROOM_NOT_FOUND", "Phong khong ton tai"));
+
+        // Khong cho an phong dang co booking active -- bao toan du lieu booking
+        if (physicalRooms.hasActiveBookings(id)) {
+            throw new ApiException(HttpStatus.CONFLICT, "ROOM_HAS_ACTIVE_BOOKINGS",
+                    "Khong the an phong dang co booking PENDING_PAYMENT hoac CONFIRMED");
+        }
+
         room.setActive(false);
         physicalRooms.save(room);
     }

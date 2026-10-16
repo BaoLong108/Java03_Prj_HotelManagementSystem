@@ -14,7 +14,7 @@ public interface RoomTypeRepository extends JpaRepository<RoomType, Long> {
 
     boolean existsByCodeIgnoreCase(String code);
 
-    /** Public: chỉ loại phòng active, kèm số phòng vật lý active — 1 query. */
+    /** Public: chi loai phong active, kem so phong vat ly active -- 1 query. */
     @Query("""
             SELECT new com.hotelpms.room.dto.RoomTypeResponse(
                 rt.id, rt.code, rt.name, rt.description,
@@ -28,7 +28,7 @@ public interface RoomTypeRepository extends JpaRepository<RoomType, Long> {
             """)
     List<RoomTypeResponse> findAllActiveWithRoomCount();
 
-    /** Public: chi tiết loại phòng active theo id — 1 query. */
+    /** Public: chi tiet loai phong active theo id -- 1 query. */
     @Query("""
             SELECT new com.hotelpms.room.dto.RoomTypeResponse(
                 rt.id, rt.code, rt.name, rt.description,
@@ -41,7 +41,7 @@ public interface RoomTypeRepository extends JpaRepository<RoomType, Long> {
             """)
     Optional<RoomTypeResponse> findActiveByIdWithRoomCount(@Param("id") Long id);
 
-    /** Admin: tất cả loại phòng (kể cả inactive) kèm số phòng vật lý active — 1 query. */
+    /** Admin: tat ca loai phong (ke ca inactive) kem so phong active -- 1 query. */
     @Query("""
             SELECT new com.hotelpms.room.dto.RoomTypeResponse(
                 rt.id, rt.code, rt.name, rt.description,
@@ -53,4 +53,20 @@ public interface RoomTypeRepository extends JpaRepository<RoomType, Long> {
             ORDER BY rt.name ASC
             """)
     List<RoomTypeResponse> findAllWithRoomCount();
+
+    /**
+     * Admin: chi tiet bat ky loai phong nao theo id (ke ca inactive).
+     * Dung sau createRoomType / updateRoomType de tra response dung.
+     */
+    @Query("""
+            SELECT new com.hotelpms.room.dto.RoomTypeResponse(
+                rt.id, rt.code, rt.name, rt.description,
+                CAST(rt.maxOccupancy AS int), rt.basePricePerNight,
+                SUM(CASE WHEN p.active = true THEN 1L ELSE 0L END)
+            )
+            FROM RoomType rt LEFT JOIN rt.physicalRooms p
+            WHERE rt.id = :id
+            GROUP BY rt.id, rt.code, rt.name, rt.description, rt.maxOccupancy, rt.basePricePerNight
+            """)
+    Optional<RoomTypeResponse> findByIdWithRoomCount(@Param("id") Long id);
 }

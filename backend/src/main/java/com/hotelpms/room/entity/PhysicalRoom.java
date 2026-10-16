@@ -13,8 +13,9 @@ import jakarta.persistence.Table;
 
 /**
  * Phong vat ly thuc te trong khach san.
- * Moi phong thuoc dung mot {@link RoomType}; so phong la duy nhat trong toan bo khach san.
- * Khong lo so phong ra ngoai API khach hang - chi dung noi bo khi tao booking.
+ * Moi phong thuoc dung mot {@link RoomType}.
+ * So phong la duy nhat trong toan bo khach san.
+ * Khong lo so phong ra ngoai public API -- chi nhan vien moi thay.
  */
 @Entity
 @Table(name = "physical_rooms")
@@ -26,7 +27,7 @@ public class PhysicalRoom extends AuditedEntity {
 
     /**
      * Loai phong ma phong nay thuoc ve.
-     * Khong thay doi sau khi tao; muon doi loai phai deactivate va tao phong moi.
+     * Khong thay doi sau khi tao -- muon doi loai phai deactivate va tao phong moi.
      */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "room_type_id", nullable = false, updatable = false)
@@ -57,6 +58,8 @@ public class PhysicalRoom extends AuditedEntity {
     public Short getFloorNumber() { return floorNumber; }
     public boolean isActive() { return active; }
 
+    /** So phong co the doi duoc (sua sai chinh ta / danh so lai). */
+    public void setRoomNumber(String roomNumber) { this.roomNumber = roomNumber; }
     public void setFloorNumber(Short floorNumber) { this.floorNumber = floorNumber; }
     public void setActive(boolean active) { this.active = active; }
 }
