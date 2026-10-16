@@ -43,6 +43,7 @@ jobs:
           DB_USER: hotel_pms
           DB_PASSWORD: hotel_pms_dev
           JWT_SECRET: ci-only-signing-key-not-for-deployment-at-least-32-characters
+          APP_PRICING_USE_STUB_PORTS: "true"
         run: |
           java -jar target/*.jar > startup.log 2>&1 &
           app_pid=$!
