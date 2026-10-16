@@ -19,3 +19,5 @@
 | `ADMIN` | Quản lý danh mục loại phòng/phòng vật lý và quyền quản trị |
 
 Các API Auth đã có hợp đồng và ví dụ trong [docs/auth.md](auth.md). Trước khi code các luồng phụ thuộc nhau, cập nhật ví dụ request/response trong PR của endpoint nghiệp vụ mới.
+
+Contract Loyalty, bảng quyền của endpoint hiện có và policy dùng cho module tương lai nằm trong [bàn giao M1-04/M1-05](m1-sprint1-handover.md). Bảng phạm vi dự kiến ở trên chưa mở endpoint nghiệp vụ trong `SecurityConfig`; từng API cần được triển khai và phân quyền cụ thể trước khi tích hợp.

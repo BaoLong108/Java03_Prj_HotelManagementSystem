@@ -22,7 +22,7 @@ docs/                    Quy ước kiến trúc, API, cộng tác
 compose.yaml             PostgreSQL cho local
 ```
 
-Backend đã có entity tài khoản, đăng ký/đăng nhập JWT và `/api/v1/auth/me`. Frontend đã có layout responsive, component chung, đăng ký/đăng nhập nối API thật, phiên đăng nhập và menu theo vai trò. Xem [hướng dẫn frontend](frontend/README.md) để nhóm tiếp tục theo cùng mẫu và [hợp đồng API Auth](docs/auth.md). Các trang phòng/booking/vận hành hiện là khung chờ API nghiệp vụ.
+Backend đã có entity tài khoản, đăng ký/đăng nhập JWT và `/api/v1/auth/me`. Frontend có hai cổng responsive cho khách và Staff/Admin, trang chủ với ảnh concept, chọn lịch/số khách, tài khoản, chính sách thành viên, lịch theo tuần và bộ component chung. Auth nối API thật, JWT và menu theo vai trò. Xem [hướng dẫn frontend](frontend/README.md), [nhật ký redesign](docs/frontend-redesign.md) và [hợp đồng API Auth](docs/auth.md). Dữ liệu phòng/booking/loyalty/báo cáo cùng các thao tác ghi nghiệp vụ còn chờ API tương ứng.
 
 ## Chạy local
 
@@ -41,7 +41,7 @@ Profile `dev` tạo ba tài khoản: `customer@hotel-pms.test`, `staff@hotel-pms
 
 ```text
 backend:  ./mvnw verify       (Windows: .\mvnw.cmd verify)
-frontend: npm ci && npm run build
+frontend: npm ci && npm run lint && npm test && npm run build
 ```
 
 Backend test dùng PostgreSQL 17 tạm thời qua embedded-postgres, tự khởi động và dừng nên không cần Docker để chạy test. CI dùng PostgreSQL service qua `TEST_DB_URL`, `TEST_DB_USER`, `TEST_DB_PASSWORD`. Các test kiểm tra migration, entity, seed, đăng ký/đăng nhập, email trùng đồng thời và token sai/hết hạn. Cần mạng ở lần đầu để Maven tải thư viện và binary PostgreSQL.

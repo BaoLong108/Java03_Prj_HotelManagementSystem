@@ -1,6 +1,6 @@
 # Frontend Hotel PMS Mini
 
-Frontend mẫu dùng React + TypeScript + React Router + Vite. Đây là nền chung để nhóm phát triển module theo cùng bố cục, component và cách gọi API.
+Frontend dùng React + TypeScript + React Router + Vite với hai bố cục: website khách và workspace Staff/Admin. Đây là nền chung để nhóm phát triển module theo cùng component, design tokens và cách gọi API.
 
 ## Chạy
 
@@ -23,13 +23,21 @@ Profile backend `dev` có `customer@hotel-pms.test`, `staff@hotel-pms.test`, `ad
 
 | Route | Trạng thái |
 | --- | --- |
-| `/` | Tổng quan, kiểm tra kết nối thật, điều hướng theo phiên |
+| `/` | Hero ảnh concept, chọn ngày/số khách, giới thiệu và chính sách thành viên |
 | `/login`, `/register` | Gọi API Auth thật; lỗi chung + lỗi từng field; đang gửi; ẩn/hiện mật khẩu |
 | `/account` | Cần đăng nhập; dữ liệu từ login/register hoặc `/auth/me` khi tải lại |
-| `/rooms` | Trang khung công khai, chờ API loại phòng của Sang |
-| `/booking` | Trang khung công khai, chờ tìm phòng/quote/hold của Binh và Đình Đạt |
-| `/staff` | Khung bảng đặt phòng; cần STAFF hoặc ADMIN |
-| `/admin` | Trang khung; cần ADMIN |
+| `/rooms` | Form ngày/số khách có validation, URL chia sẻ được; chờ API danh mục/availability của Sang |
+| `/rooms/:roomTypeId` | Trạng thái chưa sẵn sàng; chờ API chi tiết, ảnh và tiện nghi |
+| `/booking` | Tiến trình 4 bước, lịch nghỉ/summary; chờ quote/hold/payment, chưa tạo booking |
+| `/my-bookings` | CUSTOMER; lịch sử chưa có API, không suy ra danh sách trống |
+| `/staff` | Dashboard, health thật, điều hướng công cụ; KPI/chart chờ Analytics API; STAFF hoặc ADMIN |
+| `/staff/bookings` | Khung bảng đặt phòng; chờ API để bật tra cứu/filter/actions |
+| `/staff/calendar` | Xem/chuyển tuần thực; lịch phòng/booking/block chưa có API |
+| `/staff/rooms` | Trạng thái chưa sẵn sàng; không suy ra phòng trống/dọn sạch |
+| `/admin` | Điều hướng các khu vực quản trị; cần ADMIN |
+| `/admin/rooms` | Chuyển tab loại phòng/phòng vật lý/giá; chờ CRUD API |
+| `/admin/members` | Chính sách thành viên; thống kê chờ API |
+| `/admin/settings` | Quy tắc lưu trú tham chiếu; quản trị nhân viên chờ API |
 | `/ui-kit` | Tham chiếu component cho lập trình viên, không nằm trong menu sản phẩm |
 | Route khác | Trang 404 |
 
@@ -44,11 +52,16 @@ src/
   shared/
     api/client.ts            HTTP, Bearer token, ApiError, details, AbortSignal
     auth/session.ts          Lưu token trong sessionStorage của tab
-    layout/AppLayout.tsx     Sidebar, topbar, footer, menu mobile
+    layout/AppLayout.tsx     Guest navbar/footer, Staff sidebar/header,
+                             AccountMenu, tìm công cụ, RouteEffects
     ui/index.tsx             Button, LinkButton, Badge, Card, Field,
                              Alert, PageHeader, EmptyState, LoadingState
     ui/Icon.tsx              Bộ icon SVG dùng chung
     ui/ExamplePages.tsx      UI kit, trang 404
+    ui/primitives.tsx        Select, Tabs, Skeleton, PriceDisplay, DataTable,
+                             Pagination
+    ui/Feedback.tsx          Dialog, ConfirmDialog, ToastProvider/useToast
+    api/health.ts            Hook health thật, AbortController và retry
   features/
     auth/                    Thông Đạt: form, provider, guard, account
     dashboard/               Thông Đạt: tổng quan
@@ -66,7 +79,7 @@ src/
 3. Bọc trang bằng `PageHeader` và `Card`. Dùng component trong `shared/ui`; tham khảo `/ui-kit`. Màu, border, radius lấy từ tokens trong `styles.css`.
 4. Dữ liệu có đủ loading / error + retry / empty / success. Hủy GET khi unmount bằng `AbortController`. Không hiển thị dữ liệu giả khi API lỗi. Disable submit khi đang gửi để tránh thao tác lặp.
 5. Thêm route vào `App.tsx`, thêm menu nếu cần trong `AppLayout.tsx`. Route riêng tư nằm dưới `RequireAuth`; có thể dùng `roles={['ADMIN']}`. Guest xem phòng/tìm phòng/quote được; tạo hold và thanh toán yêu cầu CUSTOMER theo quyền backend.
-6. Chạy `npm run build`, kiểm tra desktop/mobile và quyền truy cập trước khi tự commit.
+6. Chạy `npm run lint`, `npm test`, `npm run build`; kiểm tra desktop/mobile và quyền truy cập trước khi tự commit.
 
 Ví dụ GET (thay `<endpoint-da-chot>` bằng endpoint thật, không đưa đường dẫn mẫu vào sản phẩm):
 
@@ -98,3 +111,29 @@ API công khai dùng `auth: false`; API riêng tư tự nhận token từ phiên
 - Logout / phiên hết hạn / token sai: không còn xem tài khoản riêng tư.
 - Mất backend: thông báo kết nối rõ ràng, không giả báo đăng nhập thành công.
 - Mobile 390px: menu mở/đóng được, form và trang không tràn ngang.
+
+## Design system và component nghiệp vụ
+
+- Tokens navy, off-white, champagne ở `styles.css`; không định nghĩa lại màu/spacing theo từng module. Tiêu đề trải nghiệm dùng Noto Serif có đủ ký tự tiếng Việt (cả chữ nghiêng), controls/workspace dùng Segoe UI/system. Font WOFF2 nằm trong `src/assets/fonts`, khai báo trong `src/fonts.css`; không tải font hoặc ảnh từ bên thứ ba khi mở web. Giữ các subset Vietnamese/Latin Extended/Latin và giấy phép OFL đi kèm khi đổi font.
+- `Dialog` dùng HTML dialog, focus trong modal, Escape, backdrop, trả focus về nút mở và khóa cuộn. `ConfirmDialog` dùng lại Dialog. Toast tự tắt sau 5 giây, có nút đóng và cleanup timer.
+- `Field type="date"` là date picker gốc của trình duyệt. `StaySearchForm` kiểm tra ngày Việt Nam, ngày đi > ngày đến, điều chỉnh ngày đi khi đến thay đổi, người lớn/trẻ em, giữ tiêu chí trong URL. Sức chứa/chính sách trẻ em phải lấy từ API; giới hạn chọn hiện tại chỉ là giới hạn UI (1–10 người lớn, 0–10 trẻ em).
+- `features/rooms/RoomCard.tsx`: RoomCard + ImageGallery; chỉ nhận props trình bày. `RoomPresentation` **chưa phải DTO REST đã chốt**. Map từ response thật sau khi thống nhất với Sang; không gọi endpoint mẫu.
+- `features/booking/BookingComponents.tsx`: BookingCard, BookingStatusBadge, BookingPriceSummary, HoldCountdown. Tất cả giá nhận từ API, `discountRate` theo tỷ lệ thập phân V1 (0.1 = 10%); không tự tính `payableAmount`.
+- HoldCountdown nhận thời hạn ISO có offset từ backend, tính lại theo đồng hồ khi tab quay lại, cleanup interval, gọi `onElapsed` một lần cho mỗi booking/thời hạn. Parent phải khóa thanh toán, tải lại booking và xác nhận trạng thái từ máy chủ; component không tự chuyển booking thành EXPIRED, không gia hạn hold trên reload. Hiện chỉ được minh họa tại UI kit vì API hold chưa tồn tại.
+- Ví dụ room, booking, báo giá và bộ đếm chỉ có ở `/ui-kit`, có nhãn minh họa rõ; không xuất hiện như dữ liệu thật trên portal.
+- Chưa thêm dark mode hoặc chart library vì chưa có dữ liệu/nhu cầu triển khai tương ứng. Icon SVG dùng một kiểu nét thống nhất.
+
+## Kiểm tra tự động
+
+Yêu cầu Node 22.13+ (khuyến nghị bản Node 22 LTS mới nhất; cùng dòng với CI).
+
+```powershell
+npm ci
+npm run lint
+npm test
+npm run build
+```
+
+ESLint kiểm tra TypeScript và unused imports. Test dùng Node test runner, không thêm runtime dependency: ngày Việt Nam, lịch lỗi, rollover, khoảng đêm, URL nhập tay, guest bounds, round-trip tiêu chí, deadline có offset và hold hết hạn sau khi tab nghỉ. Node 22 cũ có thể in cảnh báo experimental type stripping; test vẫn chạy. CI frontend chạy cả build, lint và test.
+
+Nhật ký audit, file thay đổi, kiểm tra trình duyệt và những API còn thiếu: [docs/frontend-redesign.md](../docs/frontend-redesign.md).

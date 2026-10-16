@@ -5,6 +5,7 @@ import { ApiError, errorMessage } from '../../shared/api/client'
 import { Alert, Button, Field } from '../../shared/ui'
 import { Icon } from '../../shared/ui/Icon'
 import { useAuth } from './AuthProvider'
+import courtyard from '../../assets/hotel-courtyard.webp'
 
 export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const auth = useAuth()
@@ -53,16 +54,15 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   }
 
   return <div className="auth-layout">
-    <section className="auth-story"><span className="eyebrow light">HOTEL PMS MINI</span>
-      <h1>Mỗi chuyến đi,<br />một khởi đầu mới.</h1>
+    <section className="auth-story"><img src={courtyard} alt="Không gian sân vườn khách sạn minh họa" className="auth-story-image" /><span className="eyebrow light">A LITTLE SPACE. A BETTER STAY.</span>
+      <h2 className="auth-story-title">Mỗi chuyến đi,<br />một khởi đầu mới.</h2>
       <p>Tìm không gian nghỉ ngơi phù hợp và quản lý kỳ nghỉ của bạn ở cùng một nơi.</p>
-      <div className="key-art" aria-hidden="true"><div className="key-art-orbit" /><div className="keycard"><Icon name="building" size={40} /><span>HOTEL PMS</span><strong>Welcome<br />to your stay.</strong><span className="keycard-chip" /><small>A LITTLE SPACE. A BETTER STAY.</small></div></div>
-      <div className="story-footer"><Icon name="shield" size={18} /><span>Tài khoản của bạn. Trải nghiệm của bạn.</span></div>
+      <div className="story-footer"><Icon name="sparkle" size={22} /><span>Những kỳ nghỉ đáng nhớ.<br />Những đặc quyền dành riêng.</span></div>
     </section>
     <section className="auth-form-panel" aria-labelledby="auth-title"><div className="auth-form-heading">
       <span className="small-icon teal"><Icon name={isRegister ? 'user' : 'key'} /></span>
       <p className="eyebrow">{isRegister ? 'BẮT ĐẦU HÀNH TRÌNH' : 'RẤT VUI ĐƯỢC GẶP LẠI BẠN'}</p>
-      <h2 id="auth-title">{isRegister ? 'Tạo tài khoản' : 'Đăng nhập'}</h2>
+      <h1 id="auth-title">{isRegister ? 'Tạo tài khoản' : 'Đăng nhập'}</h1>
       <p className="muted">{isRegister ? 'Đăng ký để đặt phòng và theo dõi kỳ nghỉ của bạn.' : 'Tiếp tục với tài khoản Hotel PMS của bạn.'}</p>
     </div>
       {auth.sessionExpired && <Alert tone="warning">Phiên đăng nhập đã hết hạn hoặc không còn hợp lệ. Vui lòng đăng nhập lại.</Alert>}
