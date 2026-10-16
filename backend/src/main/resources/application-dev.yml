@@ -1,0 +1,19 @@
+# Profile dev: dung embedded PostgreSQL (zonky), tu dong start cung Spring Boot.
+# Khong can cai Docker hay PostgreSQL tren may.
+spring:
+  datasource:
+    embedded: true
+    url: jdbc:postgresql://localhost:5432/hotel_pms
+    username: postgres
+    password: postgres
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+  flyway:
+    enabled: true
+
+logging:
+  level:
+    com.hotelpms: DEBUG
+    org.flywaydb: INFO
