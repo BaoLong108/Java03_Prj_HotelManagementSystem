@@ -86,6 +86,7 @@ class BookingIntegrationTest {
     @Autowired private BookingRepository bookingRepository;
     @Autowired private UserRepository userRepository;
     @Autowired private CustomerProfileRepository profileRepository;
+    @Autowired private com.hotelpms.booking.service.BookingService bookingService;
 
     private Long roomTypeId;
     private Long physicalRoomId101;
@@ -304,6 +305,174 @@ class BookingIntegrationTest {
 
         // Ensure database has exactly 1 booking
         assertThat(bookingRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void testCancelBooking_CustomerAndIdempotency() throws Exception {
+        String token = login("customer@hotel-pms.test", PASSWORD);
+        Instant startAt = Instant.now().plus(25, ChronoUnit.DAYS).truncatedTo(ChronoUnit.HOURS);
+        Instant endAt = startAt.plus(2, ChronoUnit.DAYS).minus(2, ChronoUnit.HOURS);
+
+        HttpResponse<String> createRes = post("/api/v1/bookings", new CreateBookingRequest(roomTypeId, (short) 1, startAt, endAt), token);
+        assertThat(createRes.statusCode()).isEqualTo(201);
+        String bookingCode = tree(createRes).path("bookingCode").asText();
+
+        // Cancel
+        HttpResponse<String> cancelRes = post("/api/v1/bookings/" + bookingCode + "/cancel", null, token);
+        assertThat(cancelRes.statusCode()).isEqualTo(200);
+        JsonNode cancelBody = tree(cancelRes);
+        assertThat(cancelBody.path("status").asText()).isEqualTo(BookingStatus.CANCELLED.name());
+        assertThat(cancelBody.path("cancelledAt").asText()).isNotBlank();
+
+        // Idempotent cancel
+        HttpResponse<String> cancelAgainRes = post("/api/v1/bookings/" + bookingCode + "/cancel", null, token);
+        assertThat(cancelAgainRes.statusCode()).isEqualTo(200);
+        assertThat(tree(cancelAgainRes).path("status").asText()).isEqualTo(BookingStatus.CANCELLED.name());
+    }
+
+    @Test
+    void testConfirmBooking_SuccessAndIdempotency() throws Exception {
+        String token = login("customer@hotel-pms.test", PASSWORD);
+        Instant startAt = Instant.now().plus(30, ChronoUnit.DAYS).truncatedTo(ChronoUnit.HOURS);
+        Instant endAt = startAt.plus(2, ChronoUnit.DAYS).minus(2, ChronoUnit.HOURS);
+
+        HttpResponse<String> createRes = post("/api/v1/bookings", new CreateBookingRequest(roomTypeId, (short) 1, startAt, endAt), token);
+        assertThat(createRes.statusCode()).isEqualTo(201);
+        String bookingCode = tree(createRes).path("bookingCode").asText();
+
+        // Confirm
+        HttpResponse<String> confirmRes = post("/api/v1/bookings/" + bookingCode + "/confirm", null, token);
+        assertThat(confirmRes.statusCode()).isEqualTo(200);
+        JsonNode confirmBody = tree(confirmRes);
+        assertThat(confirmBody.path("status").asText()).isEqualTo(BookingStatus.CONFIRMED.name());
+        assertThat(confirmBody.path("confirmedAt").asText()).isNotBlank();
+
+        // Idempotent confirm
+        HttpResponse<String> confirmAgainRes = post("/api/v1/bookings/" + bookingCode + "/confirm", null, token);
+        assertThat(confirmAgainRes.statusCode()).isEqualTo(200);
+        assertThat(tree(confirmAgainRes).path("status").asText()).isEqualTo(BookingStatus.CONFIRMED.name());
+    }
+
+    @Test
+    void testConfirmBooking_FailsWhenHoldExpired() throws Exception {
+        String token = login("customer@hotel-pms.test", PASSWORD);
+        Instant startAt = Instant.now().plus(35, ChronoUnit.DAYS).truncatedTo(ChronoUnit.HOURS);
+        Instant endAt = startAt.plus(2, ChronoUnit.DAYS).minus(2, ChronoUnit.HOURS);
+
+        HttpResponse<String> createRes = post("/api/v1/bookings", new CreateBookingRequest(roomTypeId, (short) 1, startAt, endAt), token);
+        assertThat(createRes.statusCode()).isEqualTo(201);
+        String bookingCode = tree(createRes).path("bookingCode").asText();
+
+        // Simulate expired hold by moving hold_expires_at 5 minutes into the past
+        jdbc.update("UPDATE bookings SET hold_expires_at = ? WHERE booking_code = ?",
+                java.sql.Timestamp.from(Instant.now().minus(5, ChronoUnit.MINUTES)), bookingCode);
+
+        // Confirming must fail with 409 BOOKING_EXPIRED
+        HttpResponse<String> confirmRes = post("/api/v1/bookings/" + bookingCode + "/confirm", null, token);
+        assertThat(confirmRes.statusCode()).isEqualTo(409);
+        assertThat(tree(confirmRes).path("code").asText()).isEqualTo("BOOKING_EXPIRED");
+
+        // Verify status in DB became EXPIRED
+        var booking = bookingRepository.findByBookingCode(bookingCode).orElseThrow();
+        assertThat(booking.getStatus()).isEqualTo(BookingStatus.EXPIRED);
+        assertThat(booking.getExpiredAt()).isNotNull();
+    }
+
+    @Test
+    void testCompleteBooking_StaffOnly() throws Exception {
+        String token = login("customer@hotel-pms.test", PASSWORD);
+        Instant startAt = Instant.now().plus(40, ChronoUnit.DAYS).truncatedTo(ChronoUnit.HOURS);
+        Instant endAt = startAt.plus(2, ChronoUnit.DAYS).minus(2, ChronoUnit.HOURS);
+
+        HttpResponse<String> createRes = post("/api/v1/bookings", new CreateBookingRequest(roomTypeId, (short) 1, startAt, endAt), token);
+        assertThat(createRes.statusCode()).isEqualTo(201);
+        String bookingCode = tree(createRes).path("bookingCode").asText();
+
+        // Customer confirms booking
+        post("/api/v1/bookings/" + bookingCode + "/confirm", null, token);
+
+        // Customer tries to complete -> 403 Forbidden
+        HttpResponse<String> custCompleteRes = post("/api/v1/bookings/" + bookingCode + "/complete", null, token);
+        assertThat(custCompleteRes.statusCode()).isEqualTo(403);
+
+        // Staff completes -> 200 OK
+        String staffToken = login("staff@hotel-pms.test", PASSWORD);
+        HttpResponse<String> staffCompleteRes = post("/api/v1/bookings/" + bookingCode + "/complete", null, staffToken);
+        assertThat(staffCompleteRes.statusCode()).isEqualTo(200);
+        JsonNode completeBody = tree(staffCompleteRes);
+        assertThat(completeBody.path("status").asText()).isEqualTo(BookingStatus.COMPLETED.name());
+        assertThat(completeBody.path("completedAt").asText()).isNotBlank();
+    }
+
+    @Test
+    void testSweepExpiredHolds_ReleasesRoom() throws Exception {
+        // Only 1 room available
+        jdbc.update("UPDATE physical_rooms SET is_active = false WHERE id = ?", physicalRoomId102);
+
+        String token = login("customer@hotel-pms.test", PASSWORD);
+        Instant startAt = Instant.now().plus(45, ChronoUnit.DAYS).truncatedTo(ChronoUnit.HOURS);
+        Instant endAt = startAt.plus(2, ChronoUnit.DAYS).minus(2, ChronoUnit.HOURS);
+
+        HttpResponse<String> res1 = post("/api/v1/bookings", new CreateBookingRequest(roomTypeId, (short) 1, startAt, endAt), token);
+        assertThat(res1.statusCode()).isEqualTo(201);
+        String bookingCode = tree(res1).path("bookingCode").asText();
+
+        // Update hold_expires_at to the past
+        jdbc.update("UPDATE bookings SET hold_expires_at = ? WHERE booking_code = ?",
+                java.sql.Timestamp.from(Instant.now().minus(10, ChronoUnit.MINUTES)), bookingCode);
+
+        // Before sweep: room is still blocked by pending hold
+        HttpResponse<String> blockedRes = post("/api/v1/bookings", new CreateBookingRequest(roomTypeId, (short) 1, startAt, endAt), token);
+        assertThat(blockedRes.statusCode()).isEqualTo(409);
+
+        // Run sweep
+        int swept = bookingService.sweepExpiredHolds(Instant.now());
+        assertThat(swept).isGreaterThanOrEqualTo(1);
+
+        // After sweep: room is now available for new bookings!
+        HttpResponse<String> availableRes = post("/api/v1/bookings", new CreateBookingRequest(roomTypeId, (short) 1, startAt, endAt), token);
+        assertThat(availableRes.statusCode()).isEqualTo(201);
+    }
+
+    @Test
+    void testHoldRace_ConfirmVsSweepRaceCondition() throws Exception {
+        String token = login("customer@hotel-pms.test", PASSWORD);
+        Instant startAt = Instant.now().plus(50, ChronoUnit.DAYS).truncatedTo(ChronoUnit.HOURS);
+        Instant endAt = startAt.plus(2, ChronoUnit.DAYS).minus(2, ChronoUnit.HOURS);
+
+        HttpResponse<String> createRes = post("/api/v1/bookings", new CreateBookingRequest(roomTypeId, (short) 1, startAt, endAt), token);
+        assertThat(createRes.statusCode()).isEqualTo(201);
+        String bookingCode = tree(createRes).path("bookingCode").asText();
+
+        // Set hold to expired
+        jdbc.update("UPDATE bookings SET hold_expires_at = ? WHERE booking_code = ?",
+                java.sql.Timestamp.from(Instant.now().minus(1, ChronoUnit.SECONDS)), bookingCode);
+
+        // Run concurrent confirm vs sweep
+        CompletableFuture<HttpResponse<String>> confirmCall = CompletableFuture.supplyAsync(() -> {
+            try {
+                return post("/api/v1/bookings/" + bookingCode + "/confirm", null, token);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+
+        CompletableFuture<Integer> sweepCall = CompletableFuture.supplyAsync(() ->
+                bookingService.sweepExpiredHolds(Instant.now())
+        );
+
+        HttpResponse<String> confirmResponse = confirmCall.join();
+        sweepCall.join();
+
+        // The booking MUST end up in either CONFIRMED or EXPIRED, never corrupted
+        var finalBooking = bookingRepository.findByBookingCode(bookingCode).orElseThrow();
+        assertThat(finalBooking.getStatus()).isIn(BookingStatus.CONFIRMED, BookingStatus.EXPIRED);
+
+        if (finalBooking.getStatus() == BookingStatus.EXPIRED) {
+            assertThat(confirmResponse.statusCode()).isEqualTo(409);
+        } else {
+            assertThat(confirmResponse.statusCode()).isEqualTo(200);
+        }
     }
 
     // Helper methods

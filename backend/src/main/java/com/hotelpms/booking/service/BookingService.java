@@ -5,6 +5,7 @@ import com.hotelpms.auth.repository.CustomerProfileRepository;
 import com.hotelpms.booking.dto.BookingResponse;
 import com.hotelpms.booking.dto.CreateBookingRequest;
 import com.hotelpms.booking.entity.Booking;
+import com.hotelpms.booking.entity.BookingStatus;
 import com.hotelpms.booking.repository.BookingRepository;
 import com.hotelpms.loyalty.LoyaltyTier;
 import com.hotelpms.shared.api.ApiException;
@@ -139,6 +140,110 @@ public class BookingService {
                 .stream()
                 .map(BookingResponse::from)
                 .toList();
+    }
+
+    @Transactional
+    public BookingResponse cancelBooking(String bookingCode, Long callerUserId, boolean isStaffOrAdmin) {
+        Booking booking = bookingRepository.findByBookingCodeForUpdate(bookingCode)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "BOOKING_NOT_FOUND", "Không tìm thấy đơn đặt phòng"));
+
+        if (!isStaffOrAdmin && !booking.getCustomerId().equals(callerUserId)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Bạn không có quyền thao tác trên đơn đặt phòng này");
+        }
+
+        if (booking.getStatus() == BookingStatus.CANCELLED) {
+            return BookingResponse.from(booking);
+        }
+
+        if (booking.getStatus() == BookingStatus.EXPIRED) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_BOOKING_STATUS", "Đơn đặt phòng đã hết hạn giữ chỗ, không thể hủy");
+        }
+
+        if (booking.getStatus() == BookingStatus.COMPLETED) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_BOOKING_STATUS", "Đơn đặt phòng đã hoàn tất kỳ nghỉ, không thể hủy");
+        }
+
+        booking.cancel(Instant.now());
+        Booking saved = bookingRepository.save(booking);
+        return BookingResponse.from(saved);
+    }
+
+    @Transactional(noRollbackFor = ApiException.class)
+    public BookingResponse confirmBooking(String bookingCode) {
+        Booking booking = bookingRepository.findByBookingCodeForUpdate(bookingCode)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "BOOKING_NOT_FOUND", "Không tìm thấy đơn đặt phòng"));
+
+        if (booking.getStatus() == BookingStatus.CONFIRMED) {
+            return BookingResponse.from(booking);
+        }
+
+        if (booking.getStatus() == BookingStatus.CANCELLED) {
+            throw new ApiException(HttpStatus.CONFLICT, "BOOKING_CANCELLED", "Đơn đặt phòng đã bị hủy");
+        }
+
+        Instant now = Instant.now();
+        if (booking.getStatus() == BookingStatus.EXPIRED || !booking.getHoldExpiresAt().isAfter(now)) {
+            if (booking.getStatus() == BookingStatus.PENDING_PAYMENT) {
+                booking.expire(now);
+                bookingRepository.save(booking);
+            }
+            throw new ApiException(HttpStatus.CONFLICT, "BOOKING_EXPIRED", "Thời hạn giữ phòng 15 phút đã hết hạn");
+        }
+
+        booking.confirm(now);
+        Booking saved = bookingRepository.save(booking);
+        return BookingResponse.from(saved);
+    }
+
+    @Transactional
+    public BookingResponse completeBooking(String bookingCode, Long callerUserId, boolean isStaffOrAdmin) {
+        if (!isStaffOrAdmin) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Chỉ nhân viên hoặc quản trị viên mới có thể hoàn tất đơn đặt phòng");
+        }
+
+        Booking booking = bookingRepository.findByBookingCodeForUpdate(bookingCode)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "BOOKING_NOT_FOUND", "Không tìm thấy đơn đặt phòng"));
+
+        if (booking.getStatus() == BookingStatus.COMPLETED) {
+            return BookingResponse.from(booking);
+        }
+
+        if (booking.getStatus() != BookingStatus.CONFIRMED) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_BOOKING_STATUS", "Chỉ đơn đặt phòng đã xác nhận (CONFIRMED) mới có thể hoàn tất");
+        }
+
+        booking.complete(Instant.now());
+        Booking saved = bookingRepository.save(booking);
+        return BookingResponse.from(saved);
+    }
+
+    @Transactional
+    public int sweepExpiredHolds(Instant now) {
+        List<Booking> expiredCandidates = bookingRepository.findByStatusAndHoldExpiresAtBefore(
+                BookingStatus.PENDING_PAYMENT,
+                now
+        );
+
+        int count = 0;
+        for (Booking candidate : expiredCandidates) {
+            if (expireHoldIfPending(candidate.getId(), now)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    @Transactional
+    public boolean expireHoldIfPending(Long bookingId, Instant now) {
+        var opt = bookingRepository.findByIdForUpdate(bookingId);
+        if (opt.isEmpty()) return false;
+        Booking booking = opt.get();
+        if (booking.getStatus() == BookingStatus.PENDING_PAYMENT && !booking.getHoldExpiresAt().isAfter(now)) {
+            booking.expire(now);
+            bookingRepository.save(booking);
+            return true;
+        }
+        return false;
     }
 
     private BigDecimal getDiscountRateForTier(LoyaltyTier tier) {

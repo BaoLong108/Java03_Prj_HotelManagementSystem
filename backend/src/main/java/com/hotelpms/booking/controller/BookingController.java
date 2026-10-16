@@ -55,4 +55,35 @@ public class BookingController {
         Long customerId = Long.valueOf(jwt.getSubject());
         return bookingService.getCustomerBookings(customerId);
     }
+
+    @PostMapping("/{bookingCode}/cancel")
+    public BookingResponse cancelBooking(
+            @PathVariable String bookingCode,
+            @AuthenticationPrincipal Jwt jwt,
+            Authentication authentication
+    ) {
+        Long callerUserId = Long.valueOf(jwt.getSubject());
+        boolean isStaffOrAdmin = authentication.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_STAFF".equals(a.getAuthority()) || "ROLE_ADMIN".equals(a.getAuthority()));
+
+        return bookingService.cancelBooking(bookingCode, callerUserId, isStaffOrAdmin);
+    }
+
+    @PostMapping("/{bookingCode}/confirm")
+    public BookingResponse confirmBooking(@PathVariable String bookingCode) {
+        return bookingService.confirmBooking(bookingCode);
+    }
+
+    @PostMapping("/{bookingCode}/complete")
+    public BookingResponse completeBooking(
+            @PathVariable String bookingCode,
+            @AuthenticationPrincipal Jwt jwt,
+            Authentication authentication
+    ) {
+        Long callerUserId = Long.valueOf(jwt.getSubject());
+        boolean isStaffOrAdmin = authentication.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_STAFF".equals(a.getAuthority()) || "ROLE_ADMIN".equals(a.getAuthority()));
+
+        return bookingService.completeBooking(bookingCode, callerUserId, isStaffOrAdmin);
+    }
 }
