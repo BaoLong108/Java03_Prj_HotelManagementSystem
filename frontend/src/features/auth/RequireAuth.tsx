@@ -1,5 +1,5 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
-import { Button, Card, EmptyState, LoadingState } from '../../shared/ui'
+import { Button, Card, EmptyState, LinkButton, LoadingState } from '../../shared/ui'
 import { Icon } from '../../shared/ui/Icon'
 import { useAuth } from './AuthProvider'
 import type { Role } from './types'
@@ -13,6 +13,6 @@ export function RequireAuth({ roles }: { roles?: Role[] }) {
     action={<Button onClick={auth.retry}><Icon name="refresh" />Thử lại</Button>} /></Card>
   if (!auth.user) return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />
   if (roles && !auth.user.roles.some((role) => roles.includes(role))) return <Card><EmptyState icon="shield"
-    title="Bạn chưa có quyền truy cập" description="Khu vực này dành cho nhân viên hoặc quản trị viên của khách sạn." /></Card>
+    title="Bạn chưa có quyền truy cập" description="Tài khoản của bạn chưa được cấp vai trò cần thiết cho khu vực này." action={<LinkButton to="/account" variant="secondary">Về tài khoản của tôi</LinkButton>} /></Card>
   return <Outlet />
 }

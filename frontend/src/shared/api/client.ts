@@ -18,6 +18,15 @@ export class ApiError extends Error {
 
 type ApiErrorBody = { code?: string; message?: string; details?: Record<string, string> }
 type RequestOptions = { method?: string; body?: unknown; token?: string; auth?: boolean; signal?: AbortSignal }
+const statusMessages: Record<number, string> = {
+  400: 'Thông tin chưa hợp lệ. Vui lòng kiểm tra lại.',
+  401: 'Vui lòng đăng nhập lại để tiếp tục.',
+  403: 'Bạn chưa có quyền thực hiện thao tác này.',
+  404: 'Không tìm thấy thông tin được yêu cầu.',
+  409: 'Dữ liệu đã thay đổi hoặc bị trùng. Vui lòng kiểm tra lại.',
+  422: 'Thông tin chưa đáp ứng điều kiện xử lý.',
+  500: 'Máy chủ chưa thể xử lý yêu cầu. Vui lòng thử lại sau.',
+}
 
 export async function apiRequest<T>(
   path: string,
@@ -47,7 +56,7 @@ export async function apiRequest<T>(
     if (response.status === 401 && token && token === readSession()?.accessToken) endSession()
     throw new ApiError(
       response.status,
-      error?.message ?? `API trả về HTTP ${response.status}`,
+      error?.message ?? statusMessages[response.status] ?? 'Dịch vụ tạm thời chưa sẵn sàng. Vui lòng thử lại sau.',
       error?.code,
       error?.details,
     )

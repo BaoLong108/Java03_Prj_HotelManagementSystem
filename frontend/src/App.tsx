@@ -4,23 +4,37 @@ import { AuthPage } from './features/auth/AuthPage'
 import { RequireAuth } from './features/auth/RequireAuth'
 import { AccountPage } from './features/auth/AccountPage'
 import { DashboardPage } from './features/dashboard/DashboardPage'
-import { RoomsPage } from './features/rooms/RoomsPage'
-import { BookingPage } from './features/booking/BookingPage'
-import { AdminPage, StaffPage } from './features/staff/WorkspacePages'
-import { AppLayout } from './shared/layout/AppLayout'
+import { RoomDetailPage, RoomsPage } from './features/rooms/RoomsPage'
+import { BookingPage, MyBookingsPage } from './features/booking/BookingPage'
+import { AdminPage, StaffPage, StaffBookingsPage, CalendarPage, RoomOperationsPage, AdminRoomsPage, AdminMembersPage, AdminSettingsPage } from './features/staff/WorkspacePages'
+import { AppLayout, RouteEffects, StaffLayout } from './shared/layout/AppLayout'
 import { NotFoundPage, UiKitPage } from './shared/ui/ExamplePages'
+import { ToastProvider } from './shared/ui'
 
 export default function App() {
-  return <AuthProvider><Routes><Route element={<AppLayout />}>
+  return <ToastProvider><AuthProvider><RouteEffects /><Routes><Route element={<AppLayout />}>
     <Route index element={<DashboardPage />} />
     <Route path="rooms" element={<RoomsPage />} />
+    <Route path="rooms/:roomTypeId" element={<RoomDetailPage />} />
     <Route path="booking" element={<BookingPage />} />
     <Route path="login" element={<AuthPage mode="login" />} />
     <Route path="register" element={<AuthPage mode="register" />} />
     <Route element={<RequireAuth />}><Route path="account" element={<AccountPage />} /></Route>
-    <Route element={<RequireAuth roles={['STAFF', 'ADMIN']} />}><Route path="staff" element={<StaffPage />} /></Route>
-    <Route element={<RequireAuth roles={['ADMIN']} />}><Route path="admin" element={<AdminPage />} /></Route>
+    <Route element={<RequireAuth roles={['CUSTOMER']} />}><Route path="my-bookings" element={<MyBookingsPage />} /></Route>
     <Route path="ui-kit" element={<UiKitPage />} />
     <Route path="*" element={<NotFoundPage />} />
-  </Route></Routes></AuthProvider>
+  </Route><Route element={<StaffLayout />}>
+    <Route element={<RequireAuth roles={['STAFF', 'ADMIN']} />}>
+      <Route path="staff" element={<StaffPage />} />
+      <Route path="staff/bookings" element={<StaffBookingsPage />} />
+      <Route path="staff/calendar" element={<CalendarPage />} />
+      <Route path="staff/rooms" element={<RoomOperationsPage />} />
+    </Route>
+    <Route element={<RequireAuth roles={['ADMIN']} />}>
+      <Route path="admin" element={<AdminPage />} />
+      <Route path="admin/rooms" element={<AdminRoomsPage />} />
+      <Route path="admin/members" element={<AdminMembersPage />} />
+      <Route path="admin/settings" element={<AdminSettingsPage />} />
+    </Route>
+  </Route></Routes></AuthProvider></ToastProvider>
 }
