@@ -11,7 +11,7 @@ const titles: Record<string, string> = {
   '/register': 'Tạo tài khoản', '/account': 'Tài khoản', '/my-bookings': 'Kỳ nghỉ của tôi',
   '/staff': 'Tổng quan vận hành', '/staff/bookings': 'Quản lý đặt phòng', '/staff/calendar': 'Lịch phòng',
   '/staff/rooms': 'Tình trạng phòng', '/admin': 'Quản trị khách sạn', '/admin/rooms': 'Danh mục phòng',
-  '/admin/members': 'Thành viên & chính sách', '/admin/settings': 'Cài đặt', '/ui-kit': 'Thư viện giao diện',
+  '/admin/members': 'Thành viên & chính sách', '/admin/settings': 'Cài đặt', '/ui-kit': 'Thư viện giao diện', '/403': 'Không đủ quyền',
 }
 
 export function Brand({ workspace = false }: { workspace?: boolean }) {
@@ -42,7 +42,8 @@ export function AccountMenu() {
   useEffect(() => { details.current?.removeAttribute('open') }, [location.pathname])
   if (auth.status === 'loading') return <span className="small muted">Đang xác thực…</span>
   if (auth.status === 'unavailable') return <Button variant="secondary" onClick={auth.retry}>Thử kết nối lại</Button>
-  if (!auth.user) return <Link className="button button--secondary button--small" to="/login"><Icon name="user" size={16} />Đăng nhập</Link>
+  if (!auth.user) return <><Link className="button button--secondary button--small" to="/login"><Icon name="user" size={16} />Đăng nhập</Link>
+    <Link className="button button--ghost button--small" to="/register">Đăng ký</Link></>
   const user = auth.user
   return <><details ref={details} className="account-menu" onKeyDown={(event) => { if (event.key === 'Escape') { details.current?.removeAttribute('open'); details.current?.querySelector('summary')?.focus() } }}
     onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) details.current?.removeAttribute('open') }}>
@@ -58,6 +59,7 @@ export function AccountMenu() {
 }
 
 export function AppLayout() {
+  const { user } = useAuth()
   const [menu, setMenu] = useState(false)
   const location = useLocation()
   useEffect(() => { setMenu(false) }, [location.pathname, location.hash])
@@ -65,12 +67,12 @@ export function AppLayout() {
   return <div className="guest-shell"><a href="#main-content" className="skip-link">Đến nội dung chính</a>
     <header className="guest-header"><div className="guest-header-inner"><Brand /><nav className="guest-nav" aria-label="Điều hướng chính">{links}</nav>
       <div className="header-actions"><AccountMenu /><Link className="button button--primary header-book" to="/rooms">Tìm phòng <Icon name="arrow" size={16} /></Link>
-        <button className="icon-button mobile-only" aria-label="Mở menu" aria-haspopup="dialog" onClick={() => setMenu(true)}><Icon name="menu" /></button></div></div></header>
-    <Dialog open={menu} onClose={() => setMenu(false)} title="Khám phá Hotel PMS"><nav className="mobile-nav" aria-label="Điều hướng trên điện thoại">{links}<Link to="/booking">Đặt phòng</Link></nav></Dialog>
+        <button className="icon-button mobile-only" aria-label="Mở menu" aria-haspopup="dialog" aria-controls="navigation-sidebar" aria-expanded={menu} onClick={() => setMenu(true)}><Icon name="menu" /></button></div></div></header>
+    <Dialog open={menu} onClose={() => setMenu(false)} title="Khám phá Hotel PMS"><nav id="navigation-sidebar" className="mobile-nav" aria-label="Điều hướng trên điện thoại">{links}<Link to="/booking">Đặt phòng</Link></nav></Dialog>
     <main id="main-content" className={`guest-main ${location.pathname === '/' ? 'guest-main--home' : ''}`} tabIndex={-1}><Outlet /></main>
     <footer className="guest-footer"><div className="footer-main"><div><Brand /><p>Một khoảng nghỉ, thật riêng.<br />Một trải nghiệm, thật trọn vẹn.</p></div>
       <div><h2>KHÁM PHÁ</h2><Link to="/rooms">Phòng & không gian</Link><Link to="/booking">Lên kế hoạch kỳ nghỉ</Link><Link to="/#membership">Đặc quyền thành viên</Link></div>
-      <div><h2>TÀI KHOẢN</h2><Link to="/account">Thông tin cá nhân</Link><Link to="/my-bookings">Kỳ nghỉ của tôi</Link><Link to="/register">Trở thành thành viên</Link></div>
+      <div><h2>TÀI KHOẢN</h2><Link to="/account">Thông tin cá nhân</Link><Link to="/my-bookings">Kỳ nghỉ của tôi</Link><Link to={user ? '/account' : '/register'}>{user ? 'Tài khoản của bạn' : 'Trở thành thành viên'}</Link></div>
       <div className="footer-note"><Icon name="leaf" size={30} /><p>Chậm lại một chút.<br />Tận hưởng nhiều hơn.</p></div></div>
       <div className="footer-bottom"><span>© {new Date().getFullYear()} Hotel PMS Mini · Nhóm 03</span><span>Đồ án khách sạn · Hình ảnh minh họa ý tưởng</span></div></footer>
   </div>

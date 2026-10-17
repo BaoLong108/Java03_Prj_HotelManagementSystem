@@ -102,3 +102,27 @@ input::placeholder { color: #7c8786; font-size: 13px; }
 .workspace-header { min-height: 72px; padding: 14px 18px; gap: 8px; }.breadcrumb { font-size: 11px; gap: 8px; }.breadcrumb-root, .breadcrumb-slash { display: none; }.workspace-header .header-actions { gap: 8px; }.workspace-header .avatar { width: 32px; height: 32px; }.workspace-header .workspace-search { background: transparent; border: 0; padding: 5px; min-height: 38px; }.main-content { padding: 27px 18px 40px; }.main-content h1 { font-size: 26px; }.main-content .page-heading p { font-size: 12px; }.today-label { font-size: 10px; padding: 10px 12px; }.workspace-banner { padding: 13px; gap: 10px; }.workspace-banner > div { align-items: start; gap: 9px; }.workspace-banner svg { width: 16px; margin-top: 2px; }.workspace-banner p { font-size: 10px; }.stats-grid { gap: 12px; }.stat-card { padding: 17px 14px; }.stat-card > div { font-size: 10px; gap: 7px; }.stat-card > div svg { width: 16px; }.stat-card > p { font-size: 9px; }.stat-card > strong { font-size: 28px; margin: 10px 0; }.workspace-dashboard-grid { grid-template-columns: 1fr; gap: 18px; }.analytics-card .empty-state { padding: 25px 0; }.quick-grid { gap: 13px; }.quick-card { padding: 20px; }.workspace-footer { padding: 20px; font-size: 8px; gap: 15px; }.calendar-toolbar { flex-direction: column; align-items: stretch; }.calendar-toolbar .button-row { justify-content: space-between; }.calendar-card { padding: 20px 14px; }.calendar-week > div { padding: 16px 2px; gap: 8px; }.calendar-week span { font-size: 9px; }.calendar-week strong { font-size: 20px; }.calendar-week small { font-size: 7px; }.operation-grid, .admin-grid, .settings-grid { grid-template-columns: 1fr; gap: 17px; }.operation-availability > p { font-size: 12px; }.admin-card { padding: 25px; }.ui-kit-grid { grid-template-columns: 1fr; }.ui-kit-grid .card { padding: 24px; }.desktop-break { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+
+/* M5-01: extend the existing shell for guest/staff navigation and narrow screens. */
+.topbar-brand { color: var(--primary); font-size: 16px; font-weight: 700; white-space: nowrap; }
+.topbar-auth { display: flex; gap: 8px; flex-shrink: 0; }
+.topbar-account > button { flex-shrink: 0; }
+.breadcrumb { min-width: 0; }
+.breadcrumb-page { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.staff-nav { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 26px; }
+.staff-nav a { padding: 12px 16px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); }
+.staff-nav a.active { background: var(--primary); color: #fff; }
+.auth-story, .auth-form-panel { min-width: 0; }
+.alert > div, .field-error, .profile-heading h2 { overflow-wrap: anywhere; }
+@media (max-width: 620px) {
+  .topbar { height: auto; min-height: 64px; padding: 12px 16px; flex-wrap: wrap; gap: 10px; }
+  .breadcrumb { width: 100%; }
+  .breadcrumb-page { margin-left: auto; font-size: 11px; }
+  .topbar-auth, .topbar-account { margin-left: auto; }
+  .account-label { display: block; max-width: 155px; }
+  .account-label small { display: none; }
+  .input-wrap input { font-size: 16px; }
+  .sidebar { padding-top: 18px; }
+  .sidebar-note { display: none; }
+  .property-switch { margin: 20px 0; }
+}

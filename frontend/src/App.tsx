@@ -8,7 +8,8 @@ import { RoomDetailPage, RoomsPage } from './features/rooms/RoomsPage'
 import { BookingPage, MyBookingsPage } from './features/booking/BookingPage'
 import { AdminPage, StaffPage, StaffBookingsPage, CalendarPage, RoomOperationsPage, AdminRoomsPage, AdminMembersPage, AdminSettingsPage } from './features/staff/WorkspacePages'
 import { AppLayout, RouteEffects, StaffLayout } from './shared/layout/AppLayout'
-import { NotFoundPage, UiKitPage } from './shared/ui/ExamplePages'
+import { StaffLayout as StaffSectionLayout } from './features/staff/StaffLayout'
+import { ForbiddenPage, NotFoundPage, UiKitPage } from './shared/ui/ExamplePages'
 import { ToastProvider } from './shared/ui'
 
 export default function App() {
@@ -22,12 +23,15 @@ export default function App() {
     <Route element={<RequireAuth />}><Route path="account" element={<AccountPage />} /></Route>
     <Route element={<RequireAuth roles={['CUSTOMER']} />}><Route path="my-bookings" element={<MyBookingsPage />} /></Route>
     <Route path="ui-kit" element={<UiKitPage />} />
+    <Route path="403" element={<ForbiddenPage />} />
     <Route path="*" element={<NotFoundPage />} />
   </Route><Route element={<StaffLayout />}>
     <Route element={<RequireAuth roles={['STAFF', 'ADMIN']} />}>
       <Route path="staff" element={<StaffPage />} />
-      <Route path="staff/bookings" element={<StaffBookingsPage />} />
-      <Route path="staff/calendar" element={<CalendarPage />} />
+      <Route element={<StaffSectionLayout />}>
+        <Route path="staff/bookings" element={<StaffBookingsPage />} />
+        <Route path="staff/calendar" element={<CalendarPage />} />
+      </Route>
       <Route path="staff/rooms" element={<RoomOperationsPage />} />
     </Route>
     <Route element={<RequireAuth roles={['ADMIN']} />}>

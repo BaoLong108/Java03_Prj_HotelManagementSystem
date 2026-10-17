@@ -52,13 +52,21 @@ export async function apiRequest<T>(
 
   if (!response.ok) {
     const error = await response.json().catch(() => null) as ApiErrorBody | null
+    const message = typeof error?.message === 'string' && error.message ? error.message
+      : statusMessages[response.status] ?? `API trả về HTTP ${response.status}`
+    const details = error?.details && typeof error.details === 'object'
+      ? Object.fromEntries(Object.entries(error.details).filter(([, value]) => typeof value === 'string')) : {}
     // A stale request must not clear a newer session created while it was in flight.
-    if (response.status === 401 && token && token === readSession()?.accessToken) endSession()
+    // Login/register 401s are form errors, not session-expiry redirects.
+    if (response.status === 401 && options.auth !== false) {
+      const currentToken = readSession()?.accessToken
+      if (token === currentToken) endSession(message)
+    }
     throw new ApiError(
       response.status,
-      error?.message ?? statusMessages[response.status] ?? 'Dịch vụ tạm thời chưa sẵn sàng. Vui lòng thử lại sau.',
-      error?.code,
-      error?.details,
+      message,
+      typeof error?.code === 'string' ? error.code : undefined,
+      details,
     )
   }
 

@@ -6,7 +6,13 @@ import { BookingCard, BookingPriceSummary, HoldCountdown } from '../../features/
 import courtyard from '../../assets/hotel-courtyard.webp'
 
 export function NotFoundPage() {
-  return <Card><EmptyState icon="info" title="Không tìm thấy trang" description="Đường dẫn có thể đã thay đổi hoặc không còn tồn tại." action={<LinkButton to="/">Về tổng quan</LinkButton>} /></Card>
+  return <Card><PageHeader eyebrow="404" title="Không tìm thấy trang" description="Đường dẫn có thể đã thay đổi hoặc không còn tồn tại." />
+    <LinkButton to="/">Về trang chủ</LinkButton></Card>
+}
+
+export function ForbiddenPage() {
+  return <Card><PageHeader eyebrow="403" title="Không đủ quyền" description="Tài khoản của bạn không có quyền truy cập khu vực này." />
+    <LinkButton to="/">Về trang chủ</LinkButton></Card>
 }
 
 // Developer reference, deliberately not linked from the product navigation.
