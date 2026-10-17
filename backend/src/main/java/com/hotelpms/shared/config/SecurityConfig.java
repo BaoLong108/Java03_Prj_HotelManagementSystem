@@ -44,9 +44,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/rooms", "/api/v1/rooms/{id}").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/pricing/quote").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/admin/room-blocks", "/api/v1/admin/room-blocks/{id}")
-                            .hasAnyRole("STAFF", "ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/v1/admin/room-blocks").hasAnyRole("STAFF", "ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/api/v1/admin/room-blocks/{id}").hasAnyRole("STAFF", "ADMIN")
+                            .hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/admin/room-blocks").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/admin/room-blocks/{id}").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/admin/rooms/types", "/api/v1/admin/rooms/physical",
                                 "/api/v1/admin/rooms/physical/{id}").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/admin/rooms/types", "/api/v1/admin/rooms/physical")

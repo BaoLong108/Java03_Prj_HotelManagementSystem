@@ -6,8 +6,6 @@ import com.hotelpms.room.service.RoomBlockService;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,7 +21,8 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
  * API nhan vien/admin quan ly block phong.
  * Base path: /api/v1/admin/room-blocks
  *
- * Nguoi thao tac lay tu JWT da xac minh cua module Auth.
+ * staffId tam thoi hardcode = 1L.
+ * TODO M1-03: lay tu JWT SecurityContext sau khi auth module hoan thien.
  */
 @RestController
 @RequestMapping("/api/v1/admin/room-blocks")
@@ -57,9 +56,8 @@ public class AdminRoomBlockController {
 
     /** POST /api/v1/admin/room-blocks -- tao block moi */
     @PostMapping
-    public ResponseEntity<RoomBlockResponse> create(@Valid @RequestBody RoomBlockRequest req,
-                                                   @AuthenticationPrincipal Jwt jwt) {
-        Long staffId = Long.valueOf(jwt.getSubject());
+    public ResponseEntity<RoomBlockResponse> create(@Valid @RequestBody RoomBlockRequest req) {
+        Long staffId = 1L; // TODO M1-03: lay tu SecurityContext
         RoomBlockResponse created = blockService.createBlock(req, staffId);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
                 .path("/{id}").buildAndExpand(created.id()).toUri();
@@ -68,8 +66,8 @@ public class AdminRoomBlockController {
 
     /** DELETE /api/v1/admin/room-blocks/{id} -- giai phong (mo block som) */
     @DeleteMapping("/{id}")
-    public RoomBlockResponse release(@PathVariable Long id, @AuthenticationPrincipal Jwt jwt) {
-        Long staffId = Long.valueOf(jwt.getSubject());
+    public RoomBlockResponse release(@PathVariable Long id) {
+        Long staffId = 1L; // TODO M1-03: lay tu SecurityContext
         return blockService.releaseBlock(id, staffId);
     }
 }
