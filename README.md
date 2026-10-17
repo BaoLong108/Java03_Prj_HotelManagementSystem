@@ -1,5 +1,7 @@
 # Hotel PMS Mini
 
+> Nhánh `dev` là bản tích hợp **WIP Sprint 1**, còn lỗi compile/backend, lint và hai test UI cần xử lý. Xem [tình trạng tích hợp và việc còn lại](docs/dev-sprint1-integration.md) trước khi chạy bản này. Các nhánh thành viên tiếp tục phát triển bình thường.
+
 Monorepo cho đồ án quản lý một khách sạn. Nguyễn Ngọc Bảo Long phụ trách kỹ thuật và tích hợp. Kế hoạch chia 4 sprint, 5 thành viên; ưu tiên hoàn thành các việc P0 trước.
 
 ## Cấu trúc
