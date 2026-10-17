@@ -55,6 +55,7 @@ public class SecurityConfig {
                             .hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/admin/rooms/types/{id}", "/api/v1/admin/rooms/physical/{id}")
                             .hasRole("ADMIN")
+                        .requestMatchers("/api/v1/bookings/**").authenticated()
                         .anyRequest().denyAll())
                 .exceptionHandling(errors -> errors
                         .authenticationEntryPoint((request, response, exception) ->
