@@ -14,4 +14,6 @@ public class ApiException extends RuntimeException {
 
     public HttpStatus getStatus() { return status; }
     public String getCode() { return code; }
+    // Compatibility with the Room module's existing error adapter.
+    public String getErrorCode() { return code; }
 }

@@ -1,4 +1,7 @@
 # Public development credentials only. Activate explicitly with the dev profile.
+spring:
+  datasource:
+    embedded: ${DB_EMBEDDED:false}
 app:
   jwt:
     secret: ${JWT_SECRET:hotel-pms-development-signing-key-change-outside-local-dev}

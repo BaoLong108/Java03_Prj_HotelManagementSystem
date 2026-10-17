@@ -41,8 +41,19 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/me").authenticated()
-                        // Business controllers are not implemented yet. Add exact method/path rules
-                        // with their owner when the real API is introduced; unknown APIs stay closed.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/rooms", "/api/v1/rooms/{id}").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/admin/room-blocks", "/api/v1/admin/room-blocks/{id}")
+                            .hasAnyRole("STAFF", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/admin/room-blocks").hasAnyRole("STAFF", "ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/admin/room-blocks/{id}").hasAnyRole("STAFF", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/admin/rooms/types", "/api/v1/admin/rooms/physical",
+                                "/api/v1/admin/rooms/physical/{id}").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/admin/rooms/types", "/api/v1/admin/rooms/physical")
+                            .hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/admin/rooms/types/{id}", "/api/v1/admin/rooms/physical/{id}")
+                            .hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/admin/rooms/types/{id}", "/api/v1/admin/rooms/physical/{id}")
+                            .hasRole("ADMIN")
                         .anyRequest().denyAll())
                 .exceptionHandling(errors -> errors
                         .authenticationEntryPoint((request, response, exception) ->
