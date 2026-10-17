@@ -3,6 +3,8 @@ spring:
   datasource:
     embedded: ${DB_EMBEDDED:false}
 app:
+  dev-postgres:
+    port: ${DEV_POSTGRES_PORT:0}
   jwt:
     secret: ${JWT_SECRET:hotel-pms-development-signing-key-change-outside-local-dev}
   demo-seed:

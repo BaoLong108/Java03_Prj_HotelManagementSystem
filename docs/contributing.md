@@ -1,6 +1,6 @@
 # Cộng tác trong repo
 
-1. Tạo nhánh từ `main`: `feature/M2-01-room-model` hoặc `fix/M3-03-hold-race`.
+1. Sprint 2 tạo nhánh mới từ `dev` sau khi PR ổn định Sprint 1 được review và merge: `feature/M2-01-room-model` hoặc `fix/M3-03-hold-race`. Nhánh cá nhân đang dùng có thể merge `origin/dev`; xem `docs/sprint1-stabilization.md`.
 2. Trước khi tạo entity/repository, đọc `docs/database.md` và mapping đúng tên bảng, cột, kiểu dữ liệu trong migration V1. Không dùng `ddl-auto=update` hoặc tự đặt tên khác cho cùng khái niệm.
 3. Mỗi PR gắn task ID, mô tả thay đổi, migration/API đổi gì, cách tự kiểm tra và ảnh chụp nếu đổi UI.
 4. PR thay đổi DTO, schema hoặc trạng thái booking cần review từ chủ sở hữu module phụ thuộc. Không sửa cùng một migration đã merge; tạo migration kế tiếp.

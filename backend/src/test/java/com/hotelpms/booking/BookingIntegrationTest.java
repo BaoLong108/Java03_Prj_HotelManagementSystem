@@ -96,25 +96,26 @@ class BookingIntegrationTest {
     void setUp() {
         bookingRepository.deleteAll();
 
-        roomTypeId = 1L;
-        physicalRoomId101 = 101L;
-        physicalRoomId102 = 102L;
+        // Keep the two-room fixture separate from V2 seeds and repository-test rooms.
+        roomTypeId = 1001L;
+        physicalRoomId101 = 10101L;
+        physicalRoomId102 = 10102L;
 
         jdbc.update("""
             INSERT INTO room_types (id, code, name, description, max_occupancy, base_price_per_night, is_active)
-            VALUES (?, 'DLX', 'Deluxe Room', 'Room description', 2, 1200000.00, true)
+            VALUES (?, 'BOOKING_TEST', 'Booking Test Room', 'Room description', 2, 1200000.00, true)
             ON CONFLICT (id) DO UPDATE SET base_price_per_night = 1200000.00, is_active = true
         """, roomTypeId);
 
         jdbc.update("""
             INSERT INTO physical_rooms (id, room_type_id, room_number, floor_number, is_active)
-            VALUES (?, ?, '101', 1, true)
+            VALUES (?, ?, 'BOOKING_TEST_101', 1, true)
             ON CONFLICT (id) DO UPDATE SET is_active = true
         """, physicalRoomId101, roomTypeId);
 
         jdbc.update("""
             INSERT INTO physical_rooms (id, room_type_id, room_number, floor_number, is_active)
-            VALUES (?, ?, '102', 1, true)
+            VALUES (?, ?, 'BOOKING_TEST_102', 1, true)
             ON CONFLICT (id) DO UPDATE SET is_active = true
         """, physicalRoomId102, roomTypeId);
 

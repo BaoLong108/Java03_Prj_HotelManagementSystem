@@ -1,5 +1,7 @@
 # Dev — tích hợp WIP Sprint 1
 
+> Báo cáo lịch sử tại commit `18a047c`, trước khi sửa lỗi tích hợp. Trạng thái và hướng dẫn mới nằm trong [bàn giao ổn định Sprint 1](sprint1-stabilization.md); các kết quả FAIL bên dưới mô tả lần kiểm tra cũ.
+
 Ngày kiểm tra: 17/10/2026. Đây là nhánh tập hợp code đã push của nhóm để tiếp tục phát triển, chưa phải bản release. Việc merge một nhánh không đồng nghĩa các task trên nhánh đó đã được nghiệm thu.
 
 ## Nhánh đã tích hợp

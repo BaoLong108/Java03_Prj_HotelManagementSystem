@@ -90,6 +90,13 @@ test('return path rejects off-site, protocol-relative, backslash, auth and contr
   }
   assert.equal(navigation.safeReturnPath('/account?view=me#details'), '/account?view=me#details')
 })
+
+test('return paths reject every ASCII control and space while keeping normal query/hash navigation', () => {
+  for (let code = 0; code <= 0x20; code++) {
+    assert.equal(navigation.safeReturnPath(`/account${String.fromCharCode(code)}?view=profile`), undefined)
+  }
+  assert.equal(navigation.safeReturnPath('/account?view=profile#details'), '/account?view=profile#details')
+})
 test('storage persists only token, expiry and minimal display user, survives another read', () => {
   const accessToken = token()
   session.saveSession({ accessToken, expiresAt: Date.now() + 3600_000, password: 'must-not-persist',

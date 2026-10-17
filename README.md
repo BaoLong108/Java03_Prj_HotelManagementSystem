@@ -1,6 +1,6 @@
 # Hotel PMS Mini
 
-> Nhánh `dev` là bản tích hợp **WIP Sprint 1**, còn lỗi compile/backend, lint và hai test UI cần xử lý. Xem [tình trạng tích hợp và việc còn lại](docs/dev-sprint1-integration.md) trước khi chạy bản này. Các nhánh thành viên tiếp tục phát triển bình thường.
+> Bản sửa ổn định Sprint 1 đã qua backend verify cùng frontend lint/test/build. Nghiệp vụ còn WIP được ghi trong [hướng dẫn đồng bộ và chạy Sprint 2](docs/sprint1-stabilization.md). PR từ `fix/sprint1-integration-stabilization` cần được review và merge vào `dev` trước khi cả nhóm pull baseline mới.
 
 Monorepo cho đồ án quản lý một khách sạn. Nguyễn Ngọc Bảo Long phụ trách kỹ thuật và tích hợp. Kế hoạch chia 4 sprint, 5 thành viên; ưu tiên hoàn thành các việc P0 trước.
 
@@ -36,6 +36,8 @@ Yêu cầu: Java 21+, Node.js 22.12+, Docker Compose. Repo có Maven Wrapper nê
 4. Chạy frontend ở terminal khác: `cd frontend`, `npm ci`, `npm run dev`. Mở địa chỉ Vite in ra, thường là `http://localhost:5173`.
 
 Backend mặc định dùng `jdbc:postgresql://localhost:5432/hotel_pms`, user `hotel_pms`, password `hotel_pms_dev`. Có thể đổi qua `DB_URL`, `DB_USER`, `DB_PASSWORD`. File `.env` ở gốc dành cho Compose; backend đọc biến môi trường của terminal chạy Java. Frontend dev server proxy `/api` và `/actuator` sang backend. Khi dùng API ở host khác, đặt `VITE_API_BASE_URL` trong `frontend/.env.local`.
+
+Không có Docker/PostgreSQL: đặt `$env:DB_EMBEDDED='true'` trong PowerShell backend rồi chạy profile `dev` như trên. Embedded PostgreSQL tự chọn port trống (đổi bằng `DEV_POSTGRES_PORT`), tạo dữ liệu tạm mới mỗi lần chạy; API vẫn ở port 8080. Muốn lưu dữ liệu qua các lần chạy, dùng Compose hoặc PostgreSQL riêng. Xem [hướng dẫn chi tiết và cách chạy test](docs/sprint1-stabilization.md).
 
 Profile `dev` tạo ba tài khoản: `customer@hotel-pms.test`, `staff@hotel-pms.test`, `admin@hotel-pms.test`; mật khẩu demo chung là `HotelPmsDemo123!`. Có thể đổi bằng `DEMO_SEED_PASSWORD` trước lần seed đầu tiên, hoặc tắt bằng `DEMO_SEED_ENABLED=false`. Seeder không ghi đè tài khoản đã tồn tại. Ngoài `dev`, phải cung cấp `JWT_SECRET` ngẫu nhiên dài ít nhất 32 ký tự; không có mật khẩu hay signing key mặc định cho môi trường đó.
 

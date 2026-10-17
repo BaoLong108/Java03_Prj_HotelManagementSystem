@@ -3,7 +3,10 @@ import type { Role } from './types'
 export function safeReturnPath(value: unknown): string | undefined {
   if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//')) return undefined
   // Reject encoded separators, backslashes and control characters; never redirect off-site.
-  if (/[\\\u0000-\u0020]|%2f|%5c|%0[ad]/i.test(value)) return undefined
+  if (/\\|%2f|%5c|%0[ad]/i.test(value)) return undefined
+  for (const character of value) {
+    if (character.charCodeAt(0) <= 0x20) return undefined
+  }
   const url = new URL(value, 'https://hotel-pms.invalid')
   if (url.origin !== 'https://hotel-pms.invalid' || /^\/(login|register|403)(\/|$)/i.test(url.pathname)) return undefined
   return url.pathname + url.search + url.hash

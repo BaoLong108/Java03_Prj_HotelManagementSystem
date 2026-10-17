@@ -6,6 +6,15 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    files: ['tests/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        Buffer: 'readonly', EventTarget: 'readonly', window: 'readonly',
+        sessionStorage: 'readonly', Response: 'readonly', AbortController: 'readonly',
+      },
+    },
+  },
+  {
     files: ['src/**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/consistent-type-imports': 'error',
