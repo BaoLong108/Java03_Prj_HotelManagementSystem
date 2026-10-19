@@ -3,6 +3,7 @@ package com.hotelpms.auth.security;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -14,8 +15,12 @@ import com.hotelpms.auth.repository.RoleRepository;
 import com.hotelpms.auth.repository.UserRepository;
 import com.hotelpms.auth.service.AuthService;
 import com.hotelpms.auth.service.JwtService;
+import com.hotelpms.booking.entity.Booking;
+import com.hotelpms.booking.entity.BookingStatus;
+import com.hotelpms.booking.repository.BookingRepository;
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
@@ -108,6 +113,7 @@ class RbacIntegrationTest {
     @Autowired private AuthService auth;
     @Autowired private PolicyProbe probe;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private BookingRepository bookings;
     private Account customer;
     private Account otherCustomer;
     private Account staff;
@@ -262,6 +268,164 @@ class RbacIntegrationTest {
             mvc.perform(get("/api/v1/admin/rooms").header("Authorization", "Bearer " + account.token()))
                     .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("FORBIDDEN"));
         }
+    }
+
+    @ParameterizedTest
+    @MethodSource("authenticatedAccounts")
+    void actualRoomRoutesEnforceInventoryAndBlockRoles(Account account) throws Exception {
+        Resource room = room();
+        mvc.perform(get("/api/v1/admin/rooms/types").header("Authorization", "Bearer " + account.token()))
+                .andExpect(status().is(account == admin ? 200 : 403));
+        mvc.perform(get("/api/v1/admin/room-blocks").param("roomId", room.roomId().toString())
+                        .header("Authorization", "Bearer " + account.token()))
+                .andExpect(status().is(account == customer ? 403 : 200));
+        if (account != admin) {
+            mvc.perform(post("/api/v1/admin/rooms/types").contentType(MediaType.APPLICATION_JSON)
+                            .content("{}").header("Authorization", "Bearer " + account.token()))
+                    .andExpect(status().isForbidden());
+        }
+    }
+
+    @Test
+    void guestCannotReadOrWriteOperationalEndpointsButCanReadPublicRooms() throws Exception {
+        mvc.perform(get("/api/v1/rooms")).andExpect(status().isOk());
+        mvc.perform(get("/api/v1/admin/room-blocks").param("roomId", "1"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/v1/admin/room-blocks").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(delete("/api/v1/admin/room-blocks/1")).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/v1/bookings").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    Stream<Account> operationalAccounts() { return Stream.of(staff, admin); }
+
+    @ParameterizedTest
+    @MethodSource("operationalAccounts")
+    void blockAuditUsesTheAuthenticatedCreatorAndReleaserEvenIfTheClientClaimsAnotherId(Account creator)
+            throws Exception {
+        Resource room = room();
+        var body = Map.of("physicalRoomId", room.roomId(), "startAt", Instant.now().plusSeconds(86400),
+                "endAt", Instant.now().plusSeconds(172800), "reason", "Security fixture",
+                "createdByUserId", customer.id(), "staffId", 1L);
+        String response = mvc.perform(post("/api/v1/admin/room-blocks").contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(body)).header("Authorization", "Bearer " + creator.token()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.createdByUserId").value(creator.id()))
+                .andReturn().getResponse().getContentAsString();
+        long blockId = json.readTree(response).path("id").asLong();
+        Account releaser = creator == staff ? admin : staff;
+        mvc.perform(delete("/api/v1/admin/room-blocks/" + blockId).param("staffId", customer.id().toString())
+                        .header("Authorization", "Bearer " + releaser.token()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.active").value(false))
+                .andExpect(jsonPath("$.createdByUserId").value(creator.id()))
+                .andExpect(jsonPath("$.releasedByUserId").value(releaser.id()));
+        assertThat(jdbc.queryForObject("SELECT created_by_user_id FROM room_blocks WHERE id = ?",
+                Long.class, blockId)).isEqualTo(creator.id());
+        assertThat(jdbc.queryForObject("SELECT released_by_user_id FROM room_blocks WHERE id = ?",
+                Long.class, blockId)).isEqualTo(releaser.id());
+    }
+
+    @Test
+    void customerCannotCreateOrReleaseBlocksOrForgeOperationalRoles() throws Exception {
+        for (String token : new String[] {customer.token(), sign(customer.id(), Instant.now().minusSeconds(1),
+                Instant.now().plusSeconds(600), Set.of("STAFF", "ADMIN"))}) {
+            mvc.perform(post("/api/v1/admin/room-blocks").contentType(MediaType.APPLICATION_JSON).content("{}")
+                            .header("Authorization", "Bearer " + token))
+                    .andExpect(status().isForbidden());
+            mvc.perform(delete("/api/v1/admin/room-blocks/1").header("Authorization", "Bearer " + token))
+                    .andExpect(status().isForbidden());
+        }
+    }
+
+    @Test
+    void revokedAndDisabledStaffTokensCannotContinueUsingTheActualBlockApi() throws Exception {
+        Resource room = room();
+        Account revoked = account(RoleCode.STAFF);
+        mvc.perform(get("/api/v1/admin/room-blocks").param("roomId", room.roomId().toString())
+                        .header("Authorization", "Bearer " + revoked.token())).andExpect(status().isOk());
+        jdbc.update("DELETE FROM user_roles WHERE user_id = ?", revoked.id());
+        mvc.perform(get("/api/v1/admin/room-blocks").param("roomId", room.roomId().toString())
+                        .header("Authorization", "Bearer " + revoked.token())).andExpect(status().isForbidden());
+        Account disabled = account(RoleCode.STAFF);
+        jdbc.update("UPDATE app_users SET is_active = false WHERE id = ?", disabled.id());
+        mvc.perform(get("/api/v1/admin/room-blocks").param("roomId", room.roomId().toString())
+                        .header("Authorization", "Bearer " + disabled.token())).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void confirmationChecksThePersistedOwnerBeforeChangingState() throws Exception {
+        Booking booking = booking(customer);
+        String path = "/api/v1/bookings/" + booking.getBookingCode();
+        mvc.perform(post(path + "/confirm").header("Authorization", "Bearer " + otherCustomer.token()))
+                .andExpect(status().isForbidden());
+        mvc.perform(post(path + "/cancel").header("Authorization", "Bearer " + otherCustomer.token()))
+                .andExpect(status().isForbidden());
+        assertThat(bookings.findById(booking.getId()).orElseThrow().getStatus())
+                .isEqualTo(BookingStatus.PENDING_PAYMENT);
+        mvc.perform(get(path).header("Authorization", "Bearer " + staff.token())).andExpect(status().isOk());
+        // Verifies the current endpoint's ownership, not the future payment acceptance criteria.
+        mvc.perform(post(path + "/confirm").header("Authorization", "Bearer " + customer.token()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void mixedCustomerStaffRoleCanReadOperationalDataButCannotMutateAnotherCustomersBooking() throws Exception {
+        Account mixed = registerCustomer();
+        jdbc.update("INSERT INTO user_roles (user_id, role_id) SELECT ?, id FROM roles WHERE code = 'STAFF'",
+                mixed.id());
+        Booking booking = booking(customer);
+        String path = "/api/v1/bookings/" + booking.getBookingCode();
+        mvc.perform(get(path).header("Authorization", "Bearer " + mixed.token())).andExpect(status().isOk());
+        for (String action : new String[] {"confirm", "cancel"}) {
+            mvc.perform(post(path + "/" + action).header("Authorization", "Bearer " + mixed.token()))
+                    .andExpect(status().isForbidden());
+        }
+        assertThat(bookings.findById(booking.getId()).orElseThrow().getStatus())
+                .isEqualTo(BookingStatus.PENDING_PAYMENT);
+    }
+
+    @ParameterizedTest
+    @MethodSource("operationalAccounts")
+    void operationalRolesCannotUseCustomerWritesAndUnlistedBookingPathsStayClosed(Account account)
+            throws Exception {
+        for (String path : new String[] {"/api/v1/bookings", "/api/v1/bookings/unknown/confirm",
+                "/api/v1/bookings/unknown/cancel"}) {
+            mvc.perform(post(path).contentType(MediaType.APPLICATION_JSON).content("{}")
+                            .header("Authorization", "Bearer " + account.token()))
+                    .andExpect(status().isForbidden());
+        }
+        mvc.perform(get("/api/v1/bookings").header("Authorization", "Bearer " + account.token()))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/bookings/unknown/complete").header("Authorization", "Bearer " + account.token()))
+                .andExpect(status().isNotFound());
+        mvc.perform(post("/api/v1/bookings/unknown/complete").header("Authorization", "Bearer " + customer.token()))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/bookings/unknown/new-action").header("Authorization", "Bearer " + account.token()))
+                .andExpect(status().isForbidden());
+    }
+
+    private record Resource(Long typeId, Long roomId) { }
+
+    private Resource room() {
+        String code = "RBAC_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+        Long typeId = jdbc.queryForObject("""
+                INSERT INTO room_types (code, name, max_occupancy, base_price_per_night)
+                VALUES (?, 'RBAC fixture', 2, 800000.00) RETURNING id
+                """, Long.class, code);
+        Long roomId = jdbc.queryForObject("""
+                INSERT INTO physical_rooms (room_type_id, room_number) VALUES (?, ?) RETURNING id
+                """, Long.class, typeId, code);
+        return new Resource(typeId, roomId);
+    }
+
+    private Booking booking(Account owner) {
+        Resource room = room();
+        Instant start = Instant.now().plusSeconds(864000);
+        return bookings.saveAndFlush(new Booking("SEC-" + UUID.randomUUID().toString().substring(0, 16),
+                owner.id(), room.typeId(), room.roomId(), (short) 1, start, start.plusSeconds(86400),
+                Instant.now().plusSeconds(900), new BigDecimal("800000.00"), BigDecimal.ZERO,
+                BigDecimal.ZERO, new BigDecimal("800000.00")));
     }
 
     private Account registerCustomer() throws Exception {
