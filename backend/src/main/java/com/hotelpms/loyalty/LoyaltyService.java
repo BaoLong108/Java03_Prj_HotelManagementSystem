@@ -9,7 +9,7 @@ import org.springframework.stereotype.Service;
 
 /** Pure M1-04 calculations. This service never awards points or updates a customer. */
 @Service
-public class LoyaltyService {
+public class LoyaltyService implements MembershipBenefitsProvider {
     private static final BigDecimal VIP_THRESHOLD = new BigDecimal("10000000.00");
     private static final BigDecimal DIAMOND_THRESHOLD = new BigDecimal("30000000.00");
     private static final BigDecimal POINT_UNIT = new BigDecimal("10000");
@@ -47,6 +47,7 @@ public class LoyaltyService {
     }
 
     /** Caller supplies the current total loaded from CustomerProfile, never a client-provided tier. */
+    @Override
     public MembershipBenefits getMembershipBenefits(BigDecimal eligibleSpendTotal) {
         BigDecimal total = money(eligibleSpendTotal, "eligibleSpendTotal");
         LoyaltyTier tier = resolveTier(total);

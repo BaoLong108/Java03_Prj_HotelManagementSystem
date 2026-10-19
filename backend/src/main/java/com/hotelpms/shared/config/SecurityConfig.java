@@ -44,9 +44,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/rooms", "/api/v1/rooms/{id}").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/pricing/quote").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/admin/room-blocks", "/api/v1/admin/room-blocks/{id}")
-                            .hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/v1/admin/room-blocks").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/api/v1/admin/room-blocks/{id}").hasRole("ADMIN")
+                            .hasAnyRole("STAFF", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/admin/room-blocks").hasAnyRole("STAFF", "ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/admin/room-blocks/{id}").hasAnyRole("STAFF", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/admin/rooms/types", "/api/v1/admin/rooms/physical",
                                 "/api/v1/admin/rooms/physical/{id}").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/admin/rooms/types", "/api/v1/admin/rooms/physical")
@@ -55,7 +55,14 @@ public class SecurityConfig {
                             .hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/admin/rooms/types/{id}", "/api/v1/admin/rooms/physical/{id}")
                             .hasRole("ADMIN")
-                        .requestMatchers("/api/v1/bookings/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/bookings").hasRole("CUSTOMER")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/bookings").hasRole("CUSTOMER")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/bookings/{bookingCode}")
+                            .hasAnyRole("CUSTOMER", "STAFF", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/bookings/{bookingCode}/cancel",
+                                "/api/v1/bookings/{bookingCode}/confirm").hasRole("CUSTOMER")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/bookings/{bookingCode}/complete")
+                            .hasAnyRole("STAFF", "ADMIN")
                         .anyRequest().denyAll())
                 .exceptionHandling(errors -> errors
                         .authenticationEntryPoint((request, response, exception) ->
