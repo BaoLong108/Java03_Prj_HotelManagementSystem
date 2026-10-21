@@ -111,3 +111,34 @@ export function formatDate(isoString?: string | null): string {
     timeZone: 'Asia/Ho_Chi_Minh',
   }).format(new Date(isoString))
 }
+
+export function getTodayDateString(): string {
+  const now = new Date()
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+  return formatter.format(now)
+}
+
+export function getTomorrowDateString(baseDateStr?: string): string {
+  const base = baseDateStr ? new Date(`${baseDateStr}T00:00:00+07:00`) : new Date()
+  base.setDate(base.getDate() + 1)
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+  return formatter.format(base)
+}
+
+export function toCheckInIso(dateStr: string): string {
+  return `${dateStr}T12:00:00+07:00`
+}
+
+export function toCheckOutIso(dateStr: string): string {
+  return `${dateStr}T10:00:00+07:00`
+}
