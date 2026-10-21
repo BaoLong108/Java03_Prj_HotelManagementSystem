@@ -270,6 +270,45 @@ td[colspan] { white-space: normal; border: 0; }
 .quote-actions { display: flex; flex-direction: column; gap: 10px; }
 .quote-guarantee-note { font-size: 11px; color: var(--muted); text-align: center; margin-top: 14px; line-height: 1.5; }
 
+/* Booking Tabs */
+.booking-tabs { display: flex; gap: 10px; margin-bottom: 24px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+.booking-tab-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; }
+.booking-tab-btn:hover { background: #f0f5f3; color: var(--ink); }
+.booking-tab-btn.active { background: #e8f3ef; color: var(--primary); border-color: #d1e5dd; }
+
+/* Hold Countdown Component */
+.hold-card { max-width: 720px; margin: 0 auto; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 36px 32px; }
+.hold-header { text-align: center; margin-bottom: 26px; }
+.hold-header h2 { font-size: 22px; color: var(--ink); margin: 12px 0 6px; }
+.hold-timer-box { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 22px; background: #fff9ed; border: 1px solid #fae6be; border-radius: 12px; margin-bottom: 26px; }
+.hold-timer-box.urgent { background: #fdf2f0; border-color: #f7cfc9; }
+.hold-timer-box.expired { background: #f5f7f8; border-color: #e6ebed; }
+.hold-timer-digits { font-size: 44px; font-weight: 800; font-family: monospace; letter-spacing: 2px; color: #956b1c; line-height: 1.1; margin: 8px 0; }
+.hold-timer-box.urgent .hold-timer-digits { color: #ad4a43; animation: pulse 1s infinite alternate; }
+.hold-timer-box.expired .hold-timer-digits { color: #889b9e; }
+@keyframes pulse { from { opacity: 1; } to { opacity: .55; } }
+.hold-progress-track { width: 100%; max-width: 320px; height: 6px; background: #eee5d3; border-radius: 3px; overflow: hidden; margin-top: 10px; }
+.hold-progress-bar { height: 100%; background: #c59737; transition: width 1s linear; }
+.hold-timer-box.urgent .hold-progress-bar { background: #ad4a43; }
+
+/* Booking Details Summary Box */
+.booking-details-box { background: #f8faf9; border: 1px solid #ebf2ef; border-radius: 10px; padding: 22px; margin-bottom: 26px; }
+.booking-details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; font-size: 12px; margin: 0; }
+.booking-details-grid dt { color: var(--muted); margin-bottom: 3px; }
+.booking-details-grid dd { margin: 0; font-weight: 600; color: var(--ink); }
+
+/* Success Card */
+.booking-success-card { max-width: 660px; margin: 0 auto; text-align: center; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 42px 32px; }
+.success-icon-badge { width: 68px; height: 68px; border-radius: 50%; background: #eaf5ee; color: #2e7d32; display: inline-grid; place-items: center; margin-bottom: 18px; }
+.booking-success-card h2 { font-size: 24px; color: var(--ink); margin-bottom: 8px; }
+
+/* Stepper Completed State */
+.booking-steps .completed { color: #358166; }
+.booking-steps .completed b { background: #eaf4ef; color: #358166; }
+
+/* My Bookings Table Actions */
+.table-actions { display: flex; gap: 8px; align-items: center; }
+
 @media (min-width: 1600px) { .main-content { padding-top: 50px; } }
 @media (max-width: 1180px) {
   :root { --sidebar-width: 220px; }
