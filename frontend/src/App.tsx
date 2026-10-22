@@ -6,11 +6,12 @@ import { AccountPage } from './features/auth/AccountPage'
 import { DashboardPage } from './features/dashboard/DashboardPage'
 import { RoomDetailPage, RoomsPage } from './features/rooms/RoomsPage'
 import { BookingPage, MyBookingsPage } from './features/booking/BookingPage'
-import { AdminPage, StaffPage, StaffBookingsPage, CalendarPage, RoomOperationsPage, AdminRoomsPage, AdminMembersPage, AdminSettingsPage } from './features/staff/WorkspacePages'
+import { AdminPage, StaffPage, StaffBookingsPage, RoomOperationsPage, AdminRoomsPage, AdminMembersPage, AdminSettingsPage } from './features/staff/WorkspacePages'
 import { AppLayout, RouteEffects, StaffLayout } from './shared/layout/AppLayout'
 import { StaffLayout as StaffSectionLayout } from './features/staff/StaffLayout'
 import { ForbiddenPage, NotFoundPage, UiKitPage } from './shared/ui/ExamplePages'
 import { ToastProvider } from './shared/ui'
+import { RoomCalendarPage } from './features/staff/calendar/RoomCalendarPage'
 
 export default function App() {
   return <ToastProvider><AuthProvider><RouteEffects /><Routes><Route element={<AppLayout />}>
@@ -30,7 +31,7 @@ export default function App() {
       <Route path="staff" element={<StaffPage />} />
       <Route element={<StaffSectionLayout />}>
         <Route path="staff/bookings" element={<StaffBookingsPage />} />
-        <Route path="staff/calendar" element={<CalendarPage />} />
+        <Route path="staff/calendar" element={<RoomCalendarPage />} />
       </Route>
       <Route path="staff/rooms" element={<RoomOperationsPage />} />
     </Route>

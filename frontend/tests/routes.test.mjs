@@ -49,7 +49,7 @@ test('authenticated header shows name/logout and hides login/register menu', () 
 })
 test('staff and multi-role users see dedicated menu and honest placeholders', () => {
   const pages = [
-    ['/staff/calendar', 'Một góc nhìn cho cả tuần', 'Lịch phòng chưa có dữ liệu xác thực'],
+    ['/staff/calendar', 'Lịch phòng', 'Đang tải lịch phòng'],
     ['/staff/bookings', 'Quản lý đặt phòng', 'Chưa thể tải đặt phòng'],
   ]
   for (const roles of [['STAFF'], ['ADMIN'], ['CUSTOMER', 'STAFF'], ['CUSTOMER', 'ADMIN']]) {
