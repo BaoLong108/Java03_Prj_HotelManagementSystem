@@ -7,6 +7,7 @@ import com.hotelpms.auth.entity.User;
 import com.hotelpms.auth.repository.CustomerProfileRepository;
 import com.hotelpms.auth.repository.UserRepository;
 import com.hotelpms.booking.dto.CreateBookingRequest;
+import com.hotelpms.booking.entity.Booking;
 import com.hotelpms.booking.entity.BookingStatus;
 import com.hotelpms.booking.repository.BookingRepository;
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres;
@@ -473,6 +474,43 @@ class BookingIntegrationTest {
         } else {
             assertThat(confirmResponse.statusCode()).isEqualTo(200);
         }
+    }
+
+    @Test
+    void testAutoCompleteDepartedBookings_CompletesConfirmedPastEndAt() throws Exception {
+        String token = login("customer@hotel-pms.test", PASSWORD);
+        Instant startAt = Instant.now().plus(60, ChronoUnit.DAYS).truncatedTo(ChronoUnit.HOURS);
+        Instant endAt = startAt.plus(2, ChronoUnit.DAYS).minus(2, ChronoUnit.HOURS);
+
+        // 1. Create booking
+        HttpResponse<String> createRes = post("/api/v1/bookings", new CreateBookingRequest(roomTypeId, (short) 1, startAt, endAt), token);
+        assertThat(createRes.statusCode()).isEqualTo(201);
+        String bookingCode = tree(createRes).path("bookingCode").asText();
+
+        // 2. Confirm booking
+        HttpResponse<String> confirmRes = post("/api/v1/bookings/" + bookingCode + "/confirm", null, token);
+        assertThat(confirmRes.statusCode()).isEqualTo(200);
+
+        // 3. Update start_at and end_at to past (stay completed)
+        Instant pastStart = Instant.now().minus(2, ChronoUnit.DAYS);
+        Instant pastEnd = Instant.now().minus(2, ChronoUnit.HOURS);
+        jdbc.update("UPDATE bookings SET start_at = ?, end_at = ? WHERE booking_code = ?",
+                java.sql.Timestamp.from(pastStart), java.sql.Timestamp.from(pastEnd), bookingCode);
+
+        // 4. Run auto-complete
+        int completedCount = bookingService.autoCompleteDepartedBookings(Instant.now());
+        assertThat(completedCount).isGreaterThanOrEqualTo(1);
+
+        // Verify status in DB is COMPLETED with completed_at set
+        Booking completed = bookingRepository.findByBookingCode(bookingCode).orElseThrow();
+        assertThat(completed.getStatus()).isEqualTo(BookingStatus.COMPLETED);
+        assertThat(completed.getCompletedAt()).isNotNull();
+
+        // 5. Idempotency: run auto-complete again, should complete 0 and not fail
+        int secondRun = bookingService.autoCompleteDepartedBookings(Instant.now());
+        assertThat(secondRun).isEqualTo(0);
+        Booking unchanged = bookingRepository.findByBookingCode(bookingCode).orElseThrow();
+        assertThat(unchanged.getStatus()).isEqualTo(BookingStatus.COMPLETED);
     }
 
     // Helper methods

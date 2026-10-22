@@ -30,4 +30,16 @@ public class HoldExpirationScheduler {
             log.error("Error during hold expiration sweeping", e);
         }
     }
+
+    @Scheduled(fixedDelayString = "${app.booking.completion-sweep-interval-ms:60000}")
+    public void sweepDepartedBookings() {
+        try {
+            int completed = bookingService.autoCompleteDepartedBookings(Instant.now());
+            if (completed > 0) {
+                log.info("HoldExpirationScheduler: automatically completed {} departed bookings", completed);
+            }
+        } catch (Exception e) {
+            log.error("Error during auto-completing departed bookings", e);
+        }
+    }
 }

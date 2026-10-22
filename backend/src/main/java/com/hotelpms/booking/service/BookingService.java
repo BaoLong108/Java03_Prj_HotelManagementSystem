@@ -246,6 +246,35 @@ public class BookingService {
         return false;
     }
 
+    @Transactional
+    public int autoCompleteDepartedBookings(Instant now) {
+        List<Booking> departedCandidates = bookingRepository.findByStatusAndEndAtLessThanEqual(
+                BookingStatus.CONFIRMED,
+                now
+        );
+
+        int count = 0;
+        for (Booking candidate : departedCandidates) {
+            if (completeBookingIfConfirmed(candidate.getId(), now)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    @Transactional
+    public boolean completeBookingIfConfirmed(Long bookingId, Instant now) {
+        var opt = bookingRepository.findByIdForUpdate(bookingId);
+        if (opt.isEmpty()) return false;
+        Booking booking = opt.get();
+        if (booking.getStatus() == BookingStatus.CONFIRMED && !booking.getEndAt().isAfter(now)) {
+            booking.complete(now);
+            bookingRepository.save(booking);
+            return true;
+        }
+        return false;
+    }
+
     private BigDecimal getDiscountRateForTier(LoyaltyTier tier) {
         if (tier == null) return BigDecimal.ZERO;
         return switch (tier) {

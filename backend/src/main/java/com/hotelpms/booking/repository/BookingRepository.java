@@ -31,6 +31,8 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     List<Booking> findByStatusAndHoldExpiresAtBefore(BookingStatus status, Instant cutoff);
 
+    List<Booking> findByStatusAndEndAtLessThanEqual(BookingStatus status, Instant cutoff);
+
     @Query("""
         SELECT COUNT(b) > 0 FROM Booking b
         WHERE b.physicalRoomId = :physicalRoomId
