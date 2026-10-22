@@ -1,47 +1,61 @@
-# M5-04, M5-03: Lịch phòng và tra cứu booking cho staff
-
-> Bản nháp, chưa tạo PR. Nhánh nguồn `DatHVT-S2`; dự kiến đích `main` sau khi PR #3 được merge và người phụ trách rebase.
-
 ## Thay đổi
 
-Thay hai placeholder staff bằng lịch phòng 7 ngày và tra cứu booking. Lịch thể hiện booking/block theo giờ, khoảng nửa mở, cột phòng cố định, bộ lọc và chi tiết. Tra cứu mã dùng API thật đã có; form SĐT và lịch dùng DTO đề xuất khi backend chưa cung cấp endpoint. Fixture chỉ bật rõ ràng bằng `VITE_USE_FIXTURES=true`, luôn có banner, không fallback khi API lỗi.
+Trên nền dev, thay hai trang staff bằng lịch phòng 7 ngày và tra cứu booking chỉ đọc. ADMIN xem phòng/loại phòng và RoomBlock từ API thật; tải block một lần mỗi phòng, giữ lỗi riêng từng hàng. STAFF/ADMIN tra cứu booking theo mã thật, mã không tồn tại hiện kết quả rỗng; trường backend chưa cấp hiển thị “—”. Giữ layout/routing hiện có của dev, không sửa backend/migration/docs chung hoặc thêm dependency.
 
-Giữ guard STAFF/ADMIN và shared API/session hiện có; 403 về trang không đủ quyền, 401 về login. Thông tin liên hệ chỉ hiển thị dạng đã che từ server; giá hiển thị snapshot, không tính lại. Hai màn hình chỉ đọc, không có check-in/check-out. Chỉ sửa `/frontend`, không thêm dependency.
+PR này dựa trên Sprint 1 [PR #3](https://github.com/BaoLong108/Java03_Prj_HotelManagementSystem/pull/3), hiện chưa merge. **Nhờ review PR #3 trước rồi review phần riêng Sprint 2.** Hai commit S1 được giữ nguyên cùng hash trên cả hai nhánh.
 
-## Chạy và kiểm tra
+## Đã nối API thật
+
+- ADMIN: `GET /api/v1/admin/rooms/types`, `GET /api/v1/admin/rooms/physical?roomTypeId=…`, `GET /api/v1/admin/room-blocks?roomId=…&history=false`.
+- STAFF/ADMIN: `GET /api/v1/bookings/{bookingCode}`; 200/404 đã kiểm chứng bằng HTTP và Edge.
+- Quyền STAFF đọc block đã kiểm chứng 200, nhưng danh sách phòng/loại phòng trả 403. Trang STAFF giải thích giới hạn thay vì giả dữ liệu hoặc gọi API ADMIN trái quyền.
+
+## Còn chờ API — không nghiệm thu toàn task
+
+- **Phước Sang/Bảo Long:** quyền hoặc API danh sách phòng/loại phòng cho STAFF. M2-06 cần lịch tổng hợp `GET /api/v1/staff/room-calendar?from=&to=&roomTypeId=…` và kiểm tra block chồng booking/hold. Chế độ thật hiện chỉ có block, luôn báo “Chưa hiển thị booking – chờ API lịch tổng hợp (M2-06, Phước Sang)”.
+- **Thanh Binh:** tìm SĐT `GET /api/v1/staff/bookings/search?phone=…`, metadata phòng và liên hệ che ở server. Lựa chọn SĐT bị disabled khi fixture tắt và adapter không gọi endpoint chưa có. Raw contact nếu xuất hiện chỉ hiển thị sau khi che tại client, kèm nhắc backend che tại nguồn; nhánh phòng vệ này được test bằng unit.
+- Không có thao tác hủy/xác nhận/complete/check-in/check-out, không tự quyết availability hoặc tính lại giá. **M5-03/M5-04 vẫn Bị chặn ở mức toàn task; phần frontend đã nối thật sẵn sàng review.**
+
+## Chạy
+
+Postgres repo dùng 5433 qua `compose.override.yaml` local đã exclude khỏi Git; container khác ở 5432 giữ nguyên. Nếu máy reviewer dùng 5432, đổi DB_URL tương ứng.
 
 ```powershell
+# Gốc repo, terminal backend
+$env:DB_URL='jdbc:postgresql://localhost:5433/hotel_pms'
+$env:CORS_ALLOWED_ORIGINS='http://localhost:5173,http://localhost:5174'
+cd backend
+.\mvnw.cmd spring-boot:run '-Dspring-boot.run.profiles=dev'
+
+# Terminal khác, frontend
 cd frontend
 npm ci
 npm test
+npm run lint
 npm run build
 $env:VITE_USE_FIXTURES='false'
 npm run dev -- --host localhost --port 5173 --strictPort
 ```
 
-Cần backend có API tại `origin/BaoLong@2fca3e4` hoặc bản tích hợp tương đương, DB repo cổng 5433, profile dev và health UP. Nhánh frontend không merge backend đó. Đăng nhập `staff@hotel-pms.test` hoặc `admin@hotel-pms.test`, tìm mã booking đã tạo trong DB.
+Đăng nhập seed ADMIN/STAFF theo README. ADMIN xem lịch, STAFF thấy giới hạn danh mục. Tra cứu mã có trong DB tại `/staff/bookings`. Bộ test local tạo `BK261022-80A81E`, loại phòng 6, phòng 16/17, block 3/4 qua API; mã này chỉ có trong DB local.
 
-Để kiểm tra phần chờ backend, khởi động lại Vite với `VITE_USE_FIXTURES=true`. Lịch chọn tuần mẫu 08/10/2026; tra cứu dùng `BK-MAU-001`, `BK-MAU-003` hoặc SĐT mẫu `0900000123`. Kiểm tra desktop, 375×812, khung lịch cuộn riêng, menu, đủ status và dữ liệu đã che.
+Fixture: terminal khác đặt `$env:VITE_USE_FIXTURES='true'`, chạy Vite cổng 5174. Chọn tuần mẫu 08/10/2026; tìm `BK-MAU-001` hoặc SĐT `0900000123`. Luôn có banner dữ liệu mẫu, không fallback tự động. Auth vẫn là API thật.
 
-## Kết quả
+## Kiểm chứng
 
-- Unit: **44/44 PASS**; TypeScript + production build **PASS**.
-- Cài sạch cuối: `npm ci --offline --no-audit` **PASS** (cache/lockfile nguyên vẹn). Lần npm ci thông thường ban đầu đạt; lần cuối tránh audit registry bị treo sau khi giải phóng file Vite bị Windows khóa.
-- API thật: STAFF/ADMIN tra cứu mã **200**, mã không có **404 BOOKING_NOT_FOUND**, token sai **401**.
-- Edge: **11/11 nhóm assertion PASS**, gồm fixture, API mã thật, guard và xử lý lỗi. Các ca HTTP giả lập được tách rõ trong bàn giao.
-- 375×812: `document.documentElement.scrollWidth === 375` cho lịch fixture và tra cứu fixture/API thật, cả menu mở.
-- **Chưa đạt tích hợp lịch/SĐT:** hai endpoint đề xuất hiện trả 403 cho STAFF/ADMIN. PASS kiểm tra frontend xử lý 403 không phải PASS nghiệp vụ.
+- `npm ci` PASS; **61/61 unit PASS**, lint PASS, TypeScript/Vite build PASS.
+- **22/22 kiểm tra HTTP thật** khớp kỳ vọng (gồm lỗi 403/404/401 mong đợi); tạo dữ liệu qua API, không chèn SQL.
+- **8/8 nhóm Playwright + Edge PASS**: 5 nhóm auth/API thật (1 nhóm chỉ xác nhận giới hạn STAFF), 2 nhóm fixture, 1 nhóm giả lập HTTP 500 từng phòng. Mobile 375×812 có `scrollWidth = 375`.
+- Backend dev health UP, Flyway chạy migrations sẵn có; profile dev vẫn bật pricing stub ports, không coi là nghiệm thu payment/pricing đầy đủ.
+- Chi tiết API, request/response, DTO đề xuất và mức đạt: [bàn giao](https://github.com/BaoLong108/Java03_Prj_HotelManagementSystem/blob/DatHVT-S2/frontend/M5-03-M5-04-handover.md).
 
 ## Ảnh
 
-| Lịch mẫu | Tra cứu mã từ API thật |
-| --- | --- |
-| ![Lịch mẫu](https://github.com/BaoLong108/Java03_Prj_HotelManagementSystem/blob/DatHVT-S2/frontend/docs-screenshots/sprint2/calendar-desktop-fixture.png?raw=true) | ![Tra cứu thật](https://github.com/BaoLong108/Java03_Prj_HotelManagementSystem/blob/DatHVT-S2/frontend/docs-screenshots/sprint2/bookings-desktop-real.png?raw=true) |
-| ![Lịch 375px](https://github.com/BaoLong108/Java03_Prj_HotelManagementSystem/blob/DatHVT-S2/frontend/docs-screenshots/sprint2/calendar-mobile-fixture.png?raw=true) | ![Tra cứu thật 375px](https://github.com/BaoLong108/Java03_Prj_HotelManagementSystem/blob/DatHVT-S2/frontend/docs-screenshots/sprint2/bookings-mobile-real.png?raw=true) |
+**API thật — ADMIN phòng/block và STAFF tra cứu mã:**
 
-## Reviewer cần chú ý
+![Lịch ADMIN API thật](https://github.com/BaoLong108/Java03_Prj_HotelManagementSystem/blob/DatHVT-S2/frontend/docs-screenshots/sprint2/dev-calendar-admin-real.png?raw=true)
+![Tra cứu STAFF API thật 375px](https://github.com/BaoLong108/Java03_Prj_HotelManagementSystem/blob/DatHVT-S2/frontend/docs-screenshots/sprint2/dev-bookings-staff-mobile-real.png?raw=true)
 
-- M5-04 chờ Phước Sang M2-06 chốt API lịch gộp room + booking + block; chưa đủ điều kiện đóng task.
-- M5-03 đã dùng endpoint mã thật. Chờ Thanh Binh M3-03 chốt tìm SĐT và roomTypeName/roomNumber/phoneMasked/emailMasked. DTO thật dùng `id` và tiền JSON number; DTO đề xuất dùng `bookingId` và decimal string.
-- Không tự coi khoảng trống là availability, không tự hết hạn hold, không lộ raw PII, không tự approve/merge.
-- Chi tiết request/response, môi trường, từng ca test và giới hạn tại [bàn giao](https://github.com/BaoLong108/Java03_Prj_HotelManagementSystem/blob/DatHVT-S2/frontend/M5-03-M5-04-handover.md).
+**Dữ liệu mẫu — chưa nghiệm thu API lịch tổng hợp:**
+
+![Lịch dữ liệu mẫu](https://github.com/BaoLong108/Java03_Prj_HotelManagementSystem/blob/DatHVT-S2/frontend/docs-screenshots/sprint2/dev-calendar-staff-du-lieu-mau.png?raw=true)
