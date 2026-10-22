@@ -13,6 +13,7 @@
 .legend-hold::before { background: #fff0cd; color: #886113; }
 .legend-block::before { background: #f7dfdf; color: #923f46; }
 .calendar-note, .fixture-help { color: var(--muted); font-size: 12px; margin: 10px 0 16px; }
+.calendar-room-error { padding: 18px; color: var(--ink); font-size: 12px; }
 .fixture-help button { padding: 0; border: 0; background: transparent; font-size: inherit; text-decoration: underline; }
 .calendar-scroll { max-width: 100%; overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: white; isolation: isolate; }
 .room-calendar-grid { table-layout: fixed; width: 100%; min-width: 1188px; border-collapse: separate; border-spacing: 0; }

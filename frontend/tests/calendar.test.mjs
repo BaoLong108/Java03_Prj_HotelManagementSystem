@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { after, test } from 'node:test'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { resolve, sep } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { pathToFileURL, URL } from 'node:url'
 import { build } from 'vite'
 
 const modulesDirectory = resolve('node_modules')
@@ -91,24 +91,63 @@ test('calendar parser rejects malformed records and never forwards extra custome
   assert.throws(() => api.parseRoomCalendar({ ...fixture, to: date('16') }, range), /không hợp lệ/)
   assert.throws(() => api.parseRoomCalendar({ ...fixture, rooms: [{}] }, range), /không hợp lệ/)
 })
-test('fixtures disabled calls real endpoint through shared client with encoded +07 offset and session token', async () => {
+const physical = (id) => ({ id, roomTypeId: 2, roomTypeName: 'Deluxe', roomNumber: String(id), floorNumber: 1, active: true })
+const block = (id, roomId, startAt = date('08','12:00'), endAt = date('09','10:00'), active = true) =>
+  ({ id, physicalRoomId: roomId, startAt, endAt, active, reason: 'Bảo trì thật', createdByUserId: 1 })
+function catalogFetch(blockResponse, rooms = [physical(21)], calls = []) {
+  return async (url, options) => {
+    calls.push(url)
+    assert.ok(options.headers.Authorization?.startsWith('Bearer '))
+    if (url === '/api/v1/admin/rooms/types') return Response.json([{ id: 2, name: 'Deluxe' }, { id: 3, name: 'Suite' }])
+    assert.ok(!url.includes('roomTypeId=3'), 'Filtered query must not load another room type')
+    if (url === '/api/v1/admin/rooms/physical?roomTypeId=2') return Response.json(rooms)
+    return blockResponse(Number(new URL(url, 'http://localhost').searchParams.get('roomId')), options)
+  }
+}
+test('real adapter joins dev types/rooms/blocks once per selected room, with session token and half-open filtering', async () => {
   const token = `header.${Buffer.from(JSON.stringify({ exp: Math.floor(Date.now()/1000) + 3600 })).toString('base64url')}.signature`
   Object.defineProperty(globalThis, 'sessionStorage', { configurable: true, value: { getItem: () => JSON.stringify({ accessToken: token, expiresAt: Date.now() + 3600000 }) } })
-  let called = 0
-  globalThis.fetch = async (url, options) => {
-    called++
-    const parsed = new URL(url, 'http://localhost')
-    assert.equal(parsed.pathname, '/api/v1/staff/room-calendar')
-    assert.equal(parsed.searchParams.get('from'), range.from)
-    assert.equal(parsed.searchParams.get('to'), range.to)
-    assert.equal(parsed.searchParams.get('roomTypeId'), '2')
-    assert.equal(options.headers.Authorization, `Bearer ${token}`)
-    return Response.json(api.roomCalendarFixture({ ...range, roomTypeId: 2 }))
+  const calls = []
+  globalThis.fetch = catalogFetch(roomId => Response.json([
+    block(1, roomId), block(2, roomId, date('07'), range.from), block(3, roomId, range.to, date('16')),
+    block(4, roomId, date('08'), date('09'), false),
+  ]), [physical(21)], calls)
+  const result = await api.getRoomCalendar({ ...range, roomTypeId: 2 })
+  assert.equal(result.rooms[0].roomTypeName, 'Deluxe')
+  assert.deepEqual(result.rooms[0].entries, [{ kind: 'BLOCK', id: 1, startAt: date('08','12:00'), endAt: date('09','10:00'), reason: 'Bảo trì thật' }])
+  assert.equal(result.roomTypes.length, 2)
+  assert.deepEqual(calls, ['/api/v1/admin/rooms/types', '/api/v1/admin/rooms/physical?roomTypeId=2', '/api/v1/admin/room-blocks?roomId=21&history=false'])
+})
+test('a failed block request keeps other rooms and marks the failed row as unknown', async () => {
+  globalThis.fetch = catalogFetch(roomId => roomId === 21 ? Response.json([block(1, roomId)]) : Response.json({ message: 'Unavailable' }, { status: 500 }), [physical(21), physical(22)])
+  const result = await api.getRoomCalendar({ ...range, roomTypeId: 2 })
+  assert.equal(result.rooms[0].entries.length, 1)
+  assert.equal(result.rooms[0].blockError, undefined)
+  assert.equal(result.rooms[1].entries.length, 0)
+  assert.match(result.rooms[1].blockError, /Chưa tải được/)
+})
+test('wrong-room, duplicate or malformed blocks are not rendered as valid data', async () => {
+  for (const blocks of [[block(1, 999)], [block(1, 21), block(1, 21)], [{ ...block(1,21), endAt: 'bad' }]]) {
+    globalThis.fetch = catalogFetch(() => Response.json(blocks))
+    const result = await api.getRoomCalendar({ ...range, roomTypeId: 2 })
+    assert.equal(result.rooms[0].entries.length, 0)
+    assert.ok(result.rooms[0].blockError)
   }
-  assert.equal((await api.getRoomCalendar({ ...range, roomTypeId: 2 })).rooms.length, 3)
-  assert.equal(called, 1)
-  globalThis.fetch = async () => Response.json({ code: 'FORBIDDEN', message: 'Không đủ quyền', details: {} }, { status: 403 })
-  await assert.rejects(api.getRoomCalendar(range), error => error.status === 403 && error.message === 'Không đủ quyền')
-  globalThis.fetch = async () => Response.json({ code: 'NO_CALENDAR', message: 'Lịch chưa sẵn sàng', details: {} }, { status: 404 })
-  await assert.rejects(api.getRoomCalendar(range), /Lịch chưa sẵn sàng/)
+})
+test('permission failures and aborts propagate instead of becoming an empty calendar', async () => {
+  globalThis.fetch = catalogFetch(() => Response.json({ code: 'FORBIDDEN', message: 'Không đủ quyền' }, { status: 403 }))
+  await assert.rejects(api.getRoomCalendar({ ...range, roomTypeId: 2 }), error => error.status === 403)
+  const controller = new AbortController()
+  globalThis.fetch = catalogFetch(() => { controller.abort(); throw new Error('aborted') })
+  await assert.rejects(api.getRoomCalendar({ ...range, roomTypeId: 2 }, controller.signal), error => error.name === 'AbortError')
+})
+test('unknown type makes no physical-room or block requests and catalog errors never use fixtures', async () => {
+  let calls = 0
+  globalThis.fetch = async () => { calls++; return Response.json([{ id: 2, name: 'Deluxe' }]) }
+  assert.equal((await api.getRoomCalendar({ ...range, roomTypeId: 999 })).rooms.length, 0)
+  assert.equal(calls, 1)
+  globalThis.fetch = async () => Response.json({ message: 'Catalog unavailable' }, { status: 500 })
+  await assert.rejects(api.getRoomCalendar(range), /Catalog unavailable/)
+  globalThis.fetch = async () => Response.json([{ id: 2, name: 'Deluxe' }, { id: 2, name: 'Duplicate' }])
+  await assert.rejects(api.getRoomCalendar(range), /không hợp lệ/)
 })

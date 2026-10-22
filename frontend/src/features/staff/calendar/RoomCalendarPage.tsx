@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useAuth } from '../../auth/AuthProvider'
 import { ApiError, errorMessage } from '../../../shared/api/client'
 import { Alert, Button, Card, EmptyState, LoadingState, PageHeader } from '../../../shared/ui'
 import { FixtureNotice, USE_FIXTURES } from '../shared/fixtureMode'
@@ -13,6 +14,8 @@ import './roomCalendar.css'
 
 type LoadState = { key: string; data?: RoomCalendar; error?: string }
 export function RoomCalendarPage() {
+  const { user } = useAuth()
+  const canReadRooms = USE_FIXTURES || Boolean(user?.roles.includes('ADMIN'))
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const requestedDate = params.get('from')
@@ -21,7 +24,7 @@ export function RoomCalendarPage() {
   const roomTypeId = /^\d+$/.test(rawType) && Number.isSafeInteger(Number(rawType)) && Number(rawType) > 0 ? Number(rawType) : undefined
   const { from, to } = calendarRange(startDate)
   const [reload, setReload] = useState(0)
-  const key = `${from}|${to}|${roomTypeId ?? ''}|${reload}`
+  const key = `${user?.id}|${canReadRooms}|${from}|${to}|${roomTypeId ?? ''}|${reload}`
   const [state, setState] = useState<LoadState>({ key: '' })
   const [roomTypes, setRoomTypes] = useState<{ id: number; name: string }[]>([])
   const [selection, setSelection] = useState<CalendarSelection | null>(null)
@@ -29,13 +32,14 @@ export function RoomCalendarPage() {
   const current = state.key === key ? state : { key }
 
   useEffect(() => {
+    if (!canReadRooms) return
     const controller = new AbortController()
     setState({ key }); setSelection(null)
     getRoomCalendar({ from, to, roomTypeId }, controller.signal).then(data => {
       if (controller.signal.aborted) return
       setState({ key, data })
       setRoomTypes(previous => {
-        const types = new Map(previous.map(type => [type.id, type.name]))
+        const types = new Map((data.roomTypes ?? previous).map(type => [type.id, type.name]))
         data.rooms.forEach(room => types.set(room.roomTypeId, room.roomTypeName))
         return [...types].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, 'vi'))
       })
@@ -45,7 +49,7 @@ export function RoomCalendarPage() {
       setState({ key, error: errorMessage(error) })
     })
     return () => controller.abort()
-  }, [from, to, roomTypeId, key, navigate])
+  }, [from, to, roomTypeId, key, navigate, canReadRooms])
 
   useEffect(() => { if (selection) details.current?.focus() }, [selection])
 
@@ -58,9 +62,12 @@ export function RoomCalendarPage() {
   return <div className="staff-calendar-page">
     <PageHeader eyebrow="KHÔNG GIAN NHÂN VIÊN" title="Lịch phòng" description="Theo dõi lịch đặt và khoảng chặn theo từng phòng vật lý." />
     <FixtureNotice />
+    {!USE_FIXTURES && <Alert tone="warning">Chưa hiển thị booking – chờ API lịch tổng hợp (M2-06, Phước Sang)</Alert>}
+    {!canReadRooms && <Card><EmptyState icon="calendar" title="Chưa tải được danh sách phòng cho STAFF"
+      description="Quyền STAFF hiện được đọc khoảng chặn nhưng chưa được đọc danh sách phòng vật lý và loại phòng. Chờ Phước Sang/Bảo Long cung cấp quyền hoặc API đọc phòng cho nhân viên. ADMIN có thể xem phòng và khoảng chặn thật." /></Card>}
     {USE_FIXTURES && <p className="fixture-help">Bộ mẫu nằm trong tháng 10/2026. <button type="button" className="text-link" onClick={() => update('2026-10-08', '')}>Xem tuần mẫu 08/10/2026</button></p>}
     {requestedDate && !isHotelDate(requestedDate) && <Alert tone="warning">Ngày trên đường dẫn không hợp lệ. Đang hiển thị từ hôm nay.</Alert>}
-    <Card className="calendar-controls"><div className="calendar-toolbar">
+    {canReadRooms && <Card className="calendar-controls"><div className="calendar-toolbar">
       <div className="calendar-week-buttons"><Button variant="secondary" onClick={() => update(addHotelDays(startDate, -7))}>Tuần trước</Button>
         <Button variant="secondary" onClick={() => update(hotelDate())}>Hôm nay</Button>
         <Button variant="secondary" onClick={() => update(addHotelDays(startDate, 7))}>Tuần sau</Button></div>
@@ -71,16 +78,17 @@ export function RoomCalendarPage() {
         {roomTypes.map(type => <option value={type.id} key={type.id}>{type.name}</option>)}
       </select></label>
       <Button variant="secondary" onClick={() => setReload(value => value + 1)}>Tải lại</Button>
-    </div><p className="calendar-range">{formatHotelTime(from)} – {formatHotelTime(to)} · Giờ Việt Nam (UTC+07:00)</p></Card>
+    </div><p className="calendar-range">{formatHotelTime(from)} – {formatHotelTime(to)} · Giờ Việt Nam (UTC+07:00)</p></Card>}
     <ul className="calendar-legend" aria-label="Chú thích lịch phòng">
-      <li className="legend-confirmed">Đã xác nhận</li><li className="legend-completed">Hoàn tất</li>
-      <li className="legend-hold">Đang giữ chỗ</li><li className="legend-block">Chặn</li>
+      {USE_FIXTURES && <><li className="legend-confirmed">Đã xác nhận</li><li className="legend-completed">Hoàn tất</li>
+      <li className="legend-hold">Đang giữ chỗ</li></>}<li className="legend-block">Chặn</li>
     </ul>
     <p className="calendar-note">Mặc định nhận phòng 12:00, trả phòng 10:00; hai lượt kề nhau cách 2 giờ. Khoảng trống trên lưới không xác nhận phòng còn trống.</p>
-    {!current.data && !current.error && <Card><LoadingState message="Đang tải lịch phòng…" /></Card>}
+    {canReadRooms && !current.data && !current.error && <Card><LoadingState message="Đang tải lịch phòng…" /></Card>}
     {current.error && <Alert>{current.error}</Alert>}
-    {current.data?.rooms.length !== 0 && current.data && !current.data.rooms.some(room => visibleCalendarEntries(room.entries, from, to).length)
-      && <p className="calendar-note" role="status">Không có booking hoặc khoảng chặn trong phạm vi đang xem.</p>}
+    {current.data?.rooms.some(room => room.blockError) && <Alert tone="warning">Một số phòng chưa tải được khoảng chặn; các hàng này chưa có dữ liệu xác thực. Hãy tải lại.</Alert>}
+    {current.data?.rooms.length !== 0 && current.data && !current.data.rooms.some(room => room.blockError || visibleCalendarEntries(room.entries, from, to).length)
+      && <p className="calendar-note" role="status">{USE_FIXTURES ? 'Không có booking hoặc khoảng chặn trong phạm vi đang xem.' : 'Không có khoảng chặn trong phạm vi đang xem. Dữ liệu booking chưa được cung cấp.'}</p>}
     {current.data && (current.data.rooms.length ? <RoomCalendarGrid calendar={current.data} onSelect={setSelection} />
       : <Card><EmptyState icon="calendar" title="Không có phòng trong kết quả" description="Máy chủ không trả phòng cho bộ lọc này. Hãy chọn loại phòng hoặc khoảng thời gian khác." /></Card>)}
     {selection && current.data && <section ref={details} tabIndex={-1} className="card calendar-details" aria-label="Chi tiết khoảng lịch">

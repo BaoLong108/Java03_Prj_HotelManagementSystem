@@ -17,6 +17,7 @@ export type BookingSearchItem = {
   discountRate: string
   payableAmount: string
   customer?: { phoneMasked: string; emailMasked: string }
+  clientMaskedContact?: boolean
 }
 
 /** Adapted view model: the current real BookingResponse has no room/contact metadata. */

@@ -56,7 +56,22 @@ test('proposed lookup retains masked contacts only, never full name or raw PII',
     const bad = fixture(); Object.assign(bad.items[0].customer, patch)
     assert.throws(() => api.parseBookingSearch(bad), error => error.code === 'UNMASKED_CUSTOMER_DATA')
   }
-  assert.throws(() => api.parseBookingDetail({ ...real, phone: '0900000123' }), error => error.code === 'UNMASKED_CUSTOMER_DATA')
+  const masked = api.parseBookingDetail({ ...real, phone: '0900000123', email: 'guest@example.test', fullName: 'Private Guest' })
+  assert.equal(masked.clientMaskedContact, true)
+  assert.deepEqual(masked.customer, { phoneMasked: '*******123', emailMasked: 'g***@example.test' })
+  for (const value of ['0900000123', 'guest@example.test', 'Private Guest']) assert.ok(!JSON.stringify(masked).includes(value))
+})
+test('real detail preserves supplied room metadata and masks nested contact without copying identity', () => {
+  const item = api.parseBookingDetail({ ...real, roomTypeName: 'Deluxe', roomNumber: null,
+    customer: { fullName: 'Private', phoneNumber: '+84912345678', email: 'private@example.test' } })
+  assert.equal(item.roomTypeName, 'Deluxe')
+  assert.equal(item.roomNumber, null)
+  assert.equal(item.customer.phoneMasked, '*******678')
+  assert.equal(item.customer.emailMasked, 'p***@example.test')
+  assert.ok(!JSON.stringify(item).includes('Private'))
+  const safe = api.parseBookingDetail({ ...real, customer: { phoneMasked: '090****123', emailMasked: 'g***@example.test' } })
+  assert.equal(safe.clientMaskedContact, undefined)
+  assert.equal(safe.customer.phoneMasked, '090****123')
 })
 test('proposed decimal strings and nullable room are validated separately from real numbers', () => {
   const data = fixture(); data.items[0].roomNumber = null
@@ -87,7 +102,7 @@ test('fixture lookup is exact, includes all five statuses and shares dates/codes
   assert.equal(new Set(items.map(item => item.status)).size, 5)
   assert.equal(items.find(item => item.bookingCode === 'BK-MAU-005').status, 'COMPLETED')
 })
-test('fixtures off uses real code endpoint and proposed phone endpoint with session token and exactly one parameter', async () => {
+test('fixtures off uses real code endpoint and refuses phone search without making an HTTP request', async () => {
   const token = `header.${Buffer.from(JSON.stringify({ exp: Math.floor(Date.now()/1000) + 3600 })).toString('base64url')}.signature`
   Object.defineProperty(globalThis, 'sessionStorage', { configurable: true, value: { getItem: () => JSON.stringify({ accessToken: token, expiresAt: Date.now() + 3600000 }) } })
   const calls = []
@@ -97,15 +112,15 @@ test('fixtures off uses real code endpoint and proposed phone endpoint with sess
     return Response.json(url.includes('/staff/') ? fixture() : real)
   }
   assert.equal((await api.searchBookings({ bookingCode: real.bookingCode })).items[0].bookingId, 15)
-  await api.searchBookings({ phone: '+84900000123' })
-  assert.deepEqual(calls, ['/api/v1/bookings/BK-REAL-001', '/api/v1/staff/bookings/search?phone=%2B84900000123'])
+  await assert.rejects(api.searchBookings({ phone: '+84900000123' }), error => error.code === 'PHONE_SEARCH_UNAVAILABLE')
+  assert.deepEqual(calls, ['/api/v1/bookings/BK-REAL-001'])
 })
 test('only BOOKING_NOT_FOUND is empty; missing API, authorization, malformed and server errors never fall back to fixture', async () => {
   globalThis.fetch = async () => Response.json({ code: 'BOOKING_NOT_FOUND', message: 'Không tìm thấy' }, { status: 404 })
   assert.deepEqual(await api.searchBookings({ bookingCode: 'MISSING' }), { items: [] })
   for (const [status, code] of [[404, 'NOT_FOUND'], [403, 'FORBIDDEN'], [500, 'INTERNAL_ERROR']]) {
     globalThis.fetch = async () => Response.json({ code, message: 'Lỗi máy chủ kiểm thử' }, { status })
-    for (const query of [{ bookingCode: 'BK-MAU-001' }, { phone: '0900000123' }]) {
+    for (const query of [{ bookingCode: 'BK-MAU-001' }]) {
       await assert.rejects(api.searchBookings(query), error => error.status === status && error.message === 'Lỗi máy chủ kiểm thử')
     }
   }

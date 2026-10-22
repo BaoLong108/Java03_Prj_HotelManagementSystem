@@ -31,8 +31,27 @@ function common(raw: Record<string, unknown>, numeric: boolean) {
 /** Real Java BigDecimal values arrive as JSON numbers. Whitelist fields; never forward customerId or raw PII. */
 export function parseBookingDetail(raw: unknown): BookingSearchItem {
   if (!record(raw) || !id(raw.id) || !id(raw.roomTypeId)) return invalid()
-  if (['fullName', 'phone', 'email', 'customer'].some(key => raw[key] != null)) return privateData()
-  return { ...common(raw, true), bookingId: raw.id, roomTypeId: raw.roomTypeId }
+  const contact = record(raw.customer) ? raw.customer : raw
+  const phone = contact.phone ?? contact.phoneNumber ?? raw.phone ?? raw.phoneNumber
+  const email = contact.email ?? raw.email
+  const serverPhone = contact.phoneMasked
+  const serverEmail = contact.emailMasked
+  const safePhone = text(serverPhone) && /^[+\d ()*-]+$/.test(serverPhone) && /\*{2,}/.test(serverPhone)
+  const safeEmail = text(serverEmail) && /^[^\s@]*\*[^\s@]*@[^\s@]+\.[^\s@]+$/.test(serverEmail)
+  const hasContact = [phone, email, serverPhone, serverEmail].some(text)
+  const needsMask = text(phone) || text(email) || (text(serverPhone) && !safePhone) || (text(serverEmail) && !safeEmail)
+  // Raw contact is never retained in the view model or storage. Ask the owner to mask at source.
+  const phoneValue = text(phone) ? phone : text(serverPhone) ? serverPhone : ''
+  const emailValue = text(email) ? email : text(serverEmail) ? serverEmail : ''
+  const digits = phoneValue.replace(/\D/g, '')
+  const maskedEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue)
+    ? `${emailValue[0]}***@${emailValue.split('@')[1]}` : '***'
+  return { ...common(raw, true), bookingId: raw.id, roomTypeId: raw.roomTypeId,
+    ...(text(raw.roomTypeName) ? { roomTypeName: raw.roomTypeName } : {}),
+    ...(raw.roomNumber === null || text(raw.roomNumber) ? { roomNumber: raw.roomNumber } : {}),
+    ...(hasContact ? { customer: { phoneMasked: safePhone ? serverPhone : phoneValue ? `*******${digits.length > 3 ? digits.slice(-3) : ''}` : '—',
+      emailMasked: safeEmail ? serverEmail : emailValue ? maskedEmail : '—' } } : {}),
+    ...(needsMask ? { clientMaskedContact: true } : {}) }
 }
 
 /** Proposed search contract: amounts are decimal strings; contact values must already be masked by the server. */
@@ -76,6 +95,5 @@ export async function searchBookings(query: BookingQuery, signal?: AbortSignal):
       throw error
     }
   }
-  const params = new URLSearchParams({ phone: normalized.phone! })
-  return parseBookingSearch(await apiRequest<unknown>(`/api/v1/staff/bookings/search?${params}`, { signal }))
+  throw new ApiError(501, 'Chờ API tìm theo SĐT (Thanh Binh)', 'PHONE_SEARCH_UNAVAILABLE')
 }

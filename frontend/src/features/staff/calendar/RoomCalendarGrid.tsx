@@ -34,6 +34,7 @@ export function RoomCalendarGrid({ calendar, onSelect }: { calendar: RoomCalenda
             {!room.isActive && <span className="inactive-label">Ngừng bán</span>}
           </th>
           <td colSpan={7} className="calendar-timeline-cell"><div className="calendar-track" style={{ height: Math.max(108, lanes * 68 + 16) }}>
+            {room.blockError && <p className="calendar-room-error" role="status">{room.blockError}</p>}
             {bars.map(({ entry, position, lane }) => <button key={`${entry.kind}-${entry.id}`} type="button"
               className={`calendar-bar calendar-bar--${entry.kind === 'BLOCK' ? 'block' : entry.status.toLowerCase()}`}
               style={{ left: `${position.leftPercent}%`, width: `${position.widthPercent}%`, top: 8 + lane * 68 }}
