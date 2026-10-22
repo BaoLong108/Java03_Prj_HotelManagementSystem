@@ -1,6 +1,6 @@
 # Bàn giao M5-04, M5-03 — tích hợp dev
 
-Kiểm tra ngày **22/10/2026**, múi giờ Asia/Ho_Chi_Minh. Nhánh `DatHVT-S2`, nền `origin/dev@b6bbe14`.
+Kiểm thử local ngày **22/10/2026**, cập nhật CI ngày **23/10/2026**, múi giờ Asia/Ho_Chi_Minh. Nhánh `DatHVT-S2`, nền `origin/dev@b6bbe14`.
 
 **Frontend sẵn sàng review; chưa đủ điều kiện đóng toàn bộ M5-04/M5-03.** ADMIN xem phòng + block thật; STAFF bị giới hạn danh sách phòng từ backend. STAFF/ADMIN tra cứu mã booking thật. Lịch booking tổng hợp và tìm SĐT vẫn chờ API.
 
@@ -9,6 +9,7 @@ Kiểm tra ngày **22/10/2026**, múi giờ Asia/Ho_Chi_Minh. Nhánh `DatHVT-S2`
 - PR #3 đã đổi base sang `dev` theo xác nhận của Bảo Long. Xung đột chỉ ở frontend, đã giữ layout/routing/tính năng hiện có trên dev. PR #3 tại `53d1f26` gồm hai commit còn thiếu: `0a4bbb5` tương đương `7b2853d`, `53d1f26` tương đương `c8218a6`.
 - `DatHVT-S2` dùng đúng hai commit đó, bốn commit S2 cũ được rebase thành `102b82b`, `1bb692e`, `30194fe`, `7438686`; commit bàn giao là `9b8b6ba`.
 - Phần nối API thật: `bbddd62`. Review PR #3 trước, rồi review phần riêng của Sprint 2. Không tự approve/merge.
+- PR Sprint 2: [#4 — M5-04, M5-03: Lịch phòng và tra cứu booking cho staff](https://github.com/BaoLong108/Java03_Prj_HotelManagementSystem/pull/4), base `dev`. PR #3 và #4 không xung đột tại lần kiểm tra; chưa có review phê duyệt.
 - Chỉ sửa file tracked trong `frontend/`; backend, migrations, docs chung giữ nguyên theo dev. `package.json`/lockfile không đổi so với dev; không thêm dependency dự án. Playwright 1.58.2 dùng từ thư mục tạm ngoài repo.
 - Các ảnh không có tiền tố `dev-` là bằng chứng lịch sử trước rebase; ảnh mới bên dưới mới phản ánh bản dev hiện tại.
 
@@ -81,6 +82,14 @@ Kết quả:
 - Playwright **1.58.2 + Edge: 8/8 nhóm kiểm tra PASS**: 5 nhóm API thật/auth thật (trong đó 1 nhóm xác nhận giới hạn STAFF), 2 nhóm fixture STAFF/ADMIN, 1 nhóm giả lập lỗi block 500. Mỗi màn hình mobile được kiểm tra `document.documentElement.scrollWidth === 375`.
 - Lượt Edge đầu dừng ở matcher `isDisabled()` cho option; đã kiểm chứng lại bằng thuộc tính DOM native `option.disabled`, chạy lại toàn bộ 8 nhóm thành công. Không sửa ứng dụng để bỏ qua kiểm tra.
 - Backend/frontend của lượt kiểm thử đã dừng; không còn listener ở 8080/5173/5174. Postgres được giữ chạy. Không dừng/xóa container, không xóa dữ liệu test.
+
+### CI backend bị chặn bởi dữ liệu thời gian trong test trên dev
+
+Tại cùng head `a3a0672`, [lượt push 39814675931](https://github.com/BaoLong108/Java03_Prj_HotelManagementSystem/actions/runs/39814675931) đạt cả backend/frontend, nhưng [lượt PR 39823555681](https://github.com/BaoLong108/Java03_Prj_HotelManagementSystem/actions/runs/39823555681) lúc 00:32 ngày 23/10 giờ Việt Nam chỉ đạt frontend. Backend chạy 160 test, lỗi 2 assertion: `testCreateBooking_SuccessAndRetrieve:142` và `testCreateBooking_VIPTierDiscount:184`, kỳ vọng `2400000.0`, thực tế `1200000.0`.
+
+Đối chiếu chỉ đọc cho thấy hai test trong `backend/src/test/java/com/hotelpms/booking/BookingIntegrationTest.java` lấy `Instant.now() + 2 ngày`, làm tròn giờ, rồi đặt end bằng start + 2 ngày - 2 giờ. `BookingService.java:56–58` tính số đêm theo chênh lệch ngày tại `Asia/Ho_Chi_Minh`. Khi test chạy lúc 00–01 giờ, khoảng dữ liệu chỉ cách **1 ngày địa phương**, trong khi assertion luôn đòi tiền 2 đêm. Ví dụ thời điểm CI trên tạo start `2026-10-25T00:00+07:00`, end `2026-10-26T22:00+07:00`: 1 đêm × 1.200.000 đúng bằng actual trong log. Đây là nguyên nhân test phụ thuộc giờ chạy, không phải thay đổi mapping giá frontend.
+
+`git diff origin/dev HEAD -- backend .github` rỗng. Đã ghi lại để **Thanh Binh/Bảo Long** sửa dữ liệu test thành giờ check-in/check-out cố định theo múi giờ khách sạn (hoặc dùng Clock kiểm soát được), rồi kiểm tra cả biên 00–01 giờ. Không sửa backend, đổi assertion, bỏ test hay chạy lại chỉ để lấy CI xanh. PR #4 **chưa đủ điều kiện merge** cho đến khi CI được xử lý và có review.
 
 ### Request/response rút gọn (token đã che)
 

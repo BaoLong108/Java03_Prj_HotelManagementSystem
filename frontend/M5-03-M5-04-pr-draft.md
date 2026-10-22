@@ -47,6 +47,7 @@ Fixture: terminal khác đặt `$env:VITE_USE_FIXTURES='true'`, chạy Vite cổ
 - **22/22 kiểm tra HTTP thật** khớp kỳ vọng (gồm lỗi 403/404/401 mong đợi); tạo dữ liệu qua API, không chèn SQL.
 - **8/8 nhóm Playwright + Edge PASS**: 5 nhóm auth/API thật (1 nhóm chỉ xác nhận giới hạn STAFF), 2 nhóm fixture, 1 nhóm giả lập HTTP 500 từng phòng. Mobile 375×812 có `scrollWidth = 375`.
 - Backend dev health UP, Flyway chạy migrations sẵn có; profile dev vẫn bật pricing stub ports, không coi là nghiệm thu payment/pricing đầy đủ.
+- **CI backend cần Thanh Binh/Bảo Long xử lý:** cùng head `a3a0672`, lượt push đạt nhưng [lượt PR 39823555681](https://github.com/BaoLong108/Java03_Prj_HotelManagementSystem/actions/runs/39823555681) lúc 00:32 giờ Việt Nam lỗi 2/160 test (`BookingIntegrationTest`, dòng 142/184: expected 2.400.000, actual 1.200.000); frontend CI đạt. Test lấy thời điểm hiện tại rồi trừ 2 giờ ở ngày kết thúc nên lúc 00–01 giờ chỉ còn một đêm theo ngày địa phương, trong khi assertion cố định hai đêm. Đã đối chiếu phép tính và source dev; backend/workflow không đổi trong PR này. Cần test dùng mốc giờ cố định, không bỏ test hoặc rerun để che lỗi. **Chưa đủ điều kiện merge.**
 - Chi tiết API, request/response, DTO đề xuất và mức đạt: [bàn giao](https://github.com/BaoLong108/Java03_Prj_HotelManagementSystem/blob/DatHVT-S2/frontend/M5-03-M5-04-handover.md).
 
 ## Ảnh
