@@ -1,5 +1,6 @@
 package com.hotelpms.pricing.dto;
 
+import com.hotelpms.pricing.snapshot.PriceSnapshot;
 import java.math.BigDecimal;
 
 /**
@@ -46,4 +47,24 @@ public record QuoteResponse(
 
         String appliedTier
 
-) {}
+) {
+
+    /**
+     * Chuyển kết quả báo giá thành {@link PriceSnapshot} để lưu xuống booking.
+     *
+     * <p>Ánh xạ là 1-1 và giữ nguyên từng giá trị: {@code baseAmount},
+     * {@code discountRate}, {@code discountAmount}, {@code payableAmount} và
+     * {@code appliedTier}. {@link PriceSnapshot} tự kiểm tra lại bất biến
+     * {@code payableAmount = baseAmount - discountAmount} nên giá trị trả về luôn
+     * hợp lệ với cùng công thức mà {@link com.hotelpms.pricing.service.QuoteService}
+     * đã dùng.
+     *
+     * <p>Không ảnh hưởng JSON contract của endpoint: {@link #toSnapshot()} là method
+     * thuần tuý, các trường hiện có vẫn được serialize như trước.
+     *
+     * @return snapshot chứa đúng các giá trị tiền và tỷ lệ của lần báo giá này
+     */
+    public PriceSnapshot toSnapshot() {
+        return new PriceSnapshot(baseAmount, discountRate, discountAmount, payableAmount, appliedTier);
+    }
+}
