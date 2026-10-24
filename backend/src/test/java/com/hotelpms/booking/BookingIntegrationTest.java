@@ -12,6 +12,7 @@ import com.hotelpms.booking.entity.BookingStatus;
 import com.hotelpms.booking.repository.BookingRepository;
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -25,6 +26,8 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -48,6 +51,9 @@ import tools.jackson.databind.ObjectMapper;
 class BookingIntegrationTest {
 
     private static final String PASSWORD = "TestDemo123!";
+    // Fixed hotel dates: November 1 at 12:00 through November 3 at 10:00 (+07:00).
+    private static final Instant TWO_NIGHT_CHECK_IN = Instant.parse("2030-11-01T05:00:00Z");
+    private static final Instant TWO_NIGHT_CHECK_OUT = Instant.parse("2030-11-03T03:00:00Z");
     private static final HttpClient HTTP = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10)).build();
     private static EmbeddedPostgres postgres;
@@ -97,25 +103,26 @@ class BookingIntegrationTest {
     void setUp() {
         bookingRepository.deleteAll();
 
-        roomTypeId = 1L;
-        physicalRoomId101 = 101L;
-        physicalRoomId102 = 102L;
+        // Keep the two-room fixture separate from V2 seeds and repository-test rooms.
+        roomTypeId = 1001L;
+        physicalRoomId101 = 10101L;
+        physicalRoomId102 = 10102L;
 
         jdbc.update("""
             INSERT INTO room_types (id, code, name, description, max_occupancy, base_price_per_night, is_active)
-            VALUES (?, 'DLX', 'Deluxe Room', 'Room description', 2, 1200000.00, true)
+            VALUES (?, 'BOOKING_TEST', 'Booking Test Room', 'Room description', 2, 1200000.00, true)
             ON CONFLICT (id) DO UPDATE SET base_price_per_night = 1200000.00, is_active = true
         """, roomTypeId);
 
         jdbc.update("""
             INSERT INTO physical_rooms (id, room_type_id, room_number, floor_number, is_active)
-            VALUES (?, ?, '101', 1, true)
+            VALUES (?, ?, 'BOOKING_TEST_101', 1, true)
             ON CONFLICT (id) DO UPDATE SET is_active = true
         """, physicalRoomId101, roomTypeId);
 
         jdbc.update("""
             INSERT INTO physical_rooms (id, room_type_id, room_number, floor_number, is_active)
-            VALUES (?, ?, '102', 1, true)
+            VALUES (?, ?, 'BOOKING_TEST_102', 1, true)
             ON CONFLICT (id) DO UPDATE SET is_active = true
         """, physicalRoomId102, roomTypeId);
 
@@ -127,8 +134,8 @@ class BookingIntegrationTest {
     void testCreateBooking_SuccessAndRetrieve() throws Exception {
         String token = login("customer@hotel-pms.test", PASSWORD);
 
-        Instant startAt = Instant.now().plus(2, ChronoUnit.DAYS).truncatedTo(ChronoUnit.HOURS);
-        Instant endAt = startAt.plus(2, ChronoUnit.DAYS).minus(2, ChronoUnit.HOURS); // 2 nights
+        Instant startAt = TWO_NIGHT_CHECK_IN;
+        Instant endAt = TWO_NIGHT_CHECK_OUT;
 
         CreateBookingRequest request = new CreateBookingRequest(roomTypeId, (short) 2, startAt, endAt);
 
@@ -172,8 +179,8 @@ class BookingIntegrationTest {
 
         String token = login("customer@hotel-pms.test", PASSWORD);
 
-        Instant startAt = Instant.now().plus(2, ChronoUnit.DAYS).truncatedTo(ChronoUnit.HOURS);
-        Instant endAt = startAt.plus(2, ChronoUnit.DAYS).minus(2, ChronoUnit.HOURS); // 2 nights
+        Instant startAt = TWO_NIGHT_CHECK_IN;
+        Instant endAt = TWO_NIGHT_CHECK_OUT;
 
         CreateBookingRequest request = new CreateBookingRequest(roomTypeId, (short) 1, startAt, endAt);
 
@@ -188,6 +195,30 @@ class BookingIntegrationTest {
 
         // Reset tier back to STANDARD
         jdbc.update("UPDATE customer_profiles SET tier_code = 'STANDARD' WHERE user_id = ?", user.getId());
+    }
+
+    @ParameterizedTest(name = "{0} to {1}: {2} VND")
+    @CsvSource({
+            "2030-11-01T05:00:00Z, 2030-11-03T03:00:00Z, 2400000.00",
+            "2030-11-01T17:00:00Z, 2030-11-03T15:00:00Z, 1200000.00",
+            "2030-11-01T18:00:00Z, 2030-11-03T16:00:00Z, 1200000.00",
+            "2030-11-01T16:00:00Z, 2030-11-03T14:00:00Z, 2400000.00"
+    })
+    void testCreateBooking_PriceUsesHotelCalendarDates(
+            String startAt, String endAt, String expectedAmount) throws Exception {
+        // Cover hotel check-in at noon, midnight, 01:00 and 23:00 via the real API.
+        String token = login("customer@hotel-pms.test", PASSWORD);
+        CreateBookingRequest request = new CreateBookingRequest(
+                roomTypeId, (short) 1, Instant.parse(startAt), Instant.parse(endAt));
+
+        HttpResponse<String> response = post("/api/v1/bookings", request, token);
+        assertThat(response.statusCode()).isEqualTo(201);
+        JsonNode body = tree(response);
+        assertThat(body.path("status").asText()).isEqualTo(BookingStatus.PENDING_PAYMENT.name());
+        assertThat(new BigDecimal(body.path("baseAmount").asText()))
+                .isEqualByComparingTo(expectedAmount);
+        assertThat(new BigDecimal(body.path("payableAmount").asText()))
+                .isEqualByComparingTo(expectedAmount);
     }
 
     @Test

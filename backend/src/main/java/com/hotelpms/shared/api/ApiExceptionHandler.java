@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -13,6 +14,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -73,5 +76,18 @@ public class ApiExceptionHandler {
         log.error("Unexpected API error", exception);
         return ResponseEntity.internalServerError()
                 .body(new ApiError("INTERNAL_ERROR", "Có lỗi xử lý, vui lòng thử lại"));
+    }
+
+    // Method-security failures can reach MVC advice before the filter's exception translator.
+    @ExceptionHandler(AccessDeniedException.class)
+    ResponseEntity<ApiError> forbidden() {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new ApiError("FORBIDDEN", "Bạn không có quyền truy cập"));
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    ResponseEntity<ApiError> unauthenticated() {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).header(HttpHeaders.WWW_AUTHENTICATE, "Bearer")
+                .body(new ApiError("UNAUTHORIZED", "Cần đăng nhập hoặc token không hợp lệ"));
     }
 }

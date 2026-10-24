@@ -1,39 +1,34 @@
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
-import { apiRequest } from '../../shared/api/client'
-import { Badge, Button, Card, LinkButton, PageHeader } from '../../shared/ui'
+import { MembershipBenefits } from '../auth/MembershipBenefits'
+import { StaySearchForm } from '../rooms/StaySearchForm'
+import { LinkButton } from '../../shared/ui'
 import { Icon } from '../../shared/ui/Icon'
+import courtyard from '../../assets/hotel-courtyard.webp'
 
 export function DashboardPage() {
   const { user } = useAuth()
-  const [connection, setConnection] = useState<'loading' | 'online' | 'offline'>('loading')
-  const [attempt, setAttempt] = useState(0)
-  useEffect(() => {
-    const controller = new AbortController()
-    setConnection('loading')
-    apiRequest<{ status: string }>('/actuator/health', { auth: false, signal: controller.signal })
-      .then((health) => { if (!controller.signal.aborted) setConnection(health.status === 'UP' ? 'online' : 'offline') })
-      .catch(() => { if (!controller.signal.aborted) setConnection('offline') })
-    return () => controller.abort()
-  }, [attempt])
   return <>
-    <PageHeader eyebrow="MỘT NGÀY MỚI, MỘT TRẢI NGHIỆM MỚI" title={user ? `Xin chào, ${user.fullName.split(' ').filter(Boolean).at(-1)}!` : 'Chào mừng đến Hotel PMS'}
-      description="Khám phá phòng và lên kế hoạch cho kỳ nghỉ của bạn."
-      action={<span className="today-label"><Icon name="calendar" size={17} />{new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date())}</span>} />
-    <section className="welcome-banner"><div><Badge>KHÔNG GIAN NGHỈ NGƠI CỦA BẠN</Badge><h2>Một kỳ nghỉ tốt đẹp,<br />bắt đầu từ đây.</h2>
-      <p>Chọn phòng phù hợp. Đặt chỗ dễ dàng.<br />Tận hưởng từng khoảnh khắc.</p><LinkButton to="/rooms">Khám phá loại phòng <Icon name="arrow" size={18} /></LinkButton></div>
-      <div className="hotel-art" aria-hidden="true"><div className="art-sun" /><div className="hotel-building"><div className="hotel-sign">HOTEL</div><div className="hotel-windows">{Array.from({ length: 12 }, (_, i) => <i key={i} />)}</div><div className="hotel-door" /></div><div className="art-plant plant-left" /><div className="art-plant plant-right" /><div className="art-ground" /></div>
+    <section className="hotel-hero"><img className="hero-image" src={courtyard} alt="Minh họa sân vườn khách sạn với mái vòm đá và mặt nước trong ánh nắng chiều" fetchPriority="high" width="1672" height="941" />
+      <div className="hero-shade" /><div className="hero-copy"><span className="hero-kicker"><i /> YOUR NEXT CHAPTER OF REST</span><h1>Một khoảng nghỉ,<br /><em>thật riêng.</em></h1>
+        <p>Gác lại những vội vã. Tìm một không gian để<br className="desktop-break" /> chậm lại, kết nối và tận hưởng từng khoảnh khắc.</p>
+        <Link className="hero-link" to="/rooms">Khám phá không gian <span><Icon name="arrow" size={20} /></span></Link></div>
+      <div className="hero-caption"><span>THE ART OF A SIMPLE STAY</span><small>Hình ảnh minh họa ý tưởng</small></div>
     </section>
-    <div className="quick-grid"><Link to="/rooms" className="quick-card"><span className="small-icon teal"><Icon name="bed" /></span><div><h3>Khám phá phòng</h3><p>Tìm không gian bạn yêu thích</p></div><Icon name="arrow" size={19} /></Link>
-      <Link to="/booking" className="quick-card"><span className="small-icon amber"><Icon name="calendar" /></span><div><h3>Đặt phòng</h3><p>Lên kế hoạch cho kỳ nghỉ</p></div><Icon name="arrow" size={19} /></Link>
-      <Link to={user ? '/account' : '/login'} className="quick-card"><span className="small-icon violet"><Icon name="user" /></span><div><h3>{user ? 'Tài khoản của bạn' : 'Trở thành thành viên'}</h3><p>{user ? 'Xem thông tin và vai trò' : 'Bắt đầu với tài khoản của bạn'}</p></div><Icon name="arrow" size={19} /></Link></div>
-    <div className="dashboard-grid"><Card><div className="card-heading"><div><p className="eyebrow">CHỈ VÀI BƯỚC ĐƠN GIẢN</p><h2>Sẵn sàng cho chuyến đi</h2></div><Icon name="key" size={24} /></div>
-      <ol className="journey-list"><li><span>01</span><div><h3>Chọn loại phòng</h3><p>Khám phá không gian và tiện nghi phù hợp.</p></div></li><li><span>02</span><div><h3>Chọn thời gian nghỉ</h3><p>Kiểm tra phòng trống cho lịch trình của bạn.</p></div></li><li><span>03</span><div><h3>Xác nhận & thanh toán</h3><p>Đăng nhập để giữ chỗ và hoàn tất đặt phòng.</p></div></li></ol></Card>
-      <div className="dashboard-aside"><Card className="connection-card"><div className="card-heading"><h2>Kết nối dịch vụ</h2><span className={`connection-dot ${connection}`} /></div>
-        <Badge tone={connection === 'online' ? 'success' : connection === 'offline' ? 'warning' : 'neutral'}>{connection === 'online' ? 'Sẵn sàng' : connection === 'offline' ? 'Tạm gián đoạn' : 'Đang kiểm tra'}</Badge>
-        <p className="muted">{connection === 'online' ? 'Máy chủ đang hoạt động. Bạn có thể đăng ký và đăng nhập tài khoản.' : connection === 'offline' ? 'Chưa kết nối được máy chủ. Hãy thử lại sau ít phút.' : 'Đang kiểm tra kết nối đến máy chủ.'}</p>
-        <Button variant="ghost" onClick={() => setAttempt((value) => value + 1)} busy={connection === 'loading'}><Icon name="refresh" size={16} />Kiểm tra lại</Button></Card>
-        <Card className="member-card"><Icon name="shield" size={26} /><h2>{user ? 'Tất cả ở cùng một nơi' : 'Chào bạn, vị khách mới!'}</h2><p className="muted">{user ? 'Thông tin tài khoản luôn sẵn sàng khi bạn cần.' : 'Bạn có thể khám phá phòng trước khi tạo tài khoản.'}</p><Link className="text-link" to={user ? '/account' : '/register'}>{user ? 'Xem tài khoản' : 'Tạo tài khoản miễn phí'}<Icon name="arrow" size={16} /></Link></Card></div></div>
+    <div className="home-search-wrap"><StaySearchForm /><p className="search-footnote"><Icon name="info" size={14} />Danh mục phòng đang được cập nhật. Bạn có thể chọn trước lịch nghỉ.</p></div>
+    <section className="home-section intro-section" id="experience"><div><p className="eyebrow">CHÀO MỪNG ĐẾN HOTEL PMS</p><h2>Không chỉ là nơi ở.<br /><span>Là thời gian cho chính bạn.</span></h2></div><p>Những kỳ nghỉ đáng nhớ bắt đầu từ lựa chọn phù hợp. Khám phá không gian, lên kế hoạch và quản lý hành trình của bạn trong một trải nghiệm liền mạch.</p></section>
+    <section className="home-section room-discovery"><div className="section-heading"><div><p className="eyebrow">FIND YOUR SPACE</p><h2>Phòng & không gian</h2></div><Link className="text-link" to="/rooms">Xem loại phòng <Icon name="arrow" size={17} /></Link></div>
+      <div className="room-preview"><div className="room-preview-visual"><img src={courtyard} alt="Không gian kiến trúc khách sạn minh họa" loading="lazy" width="1672" height="941" /><span className="image-caption">A SLOWER KIND OF STAY · MINH HỌA</span></div>
+        <div className="room-preview-copy"><span className="outline-label">BỘ SƯU TẬP KHÔNG GIAN</span><h3>Kỳ nghỉ của bạn,<br />theo cách của bạn.</h3><p>Danh mục loại phòng và tiện nghi đang được chuẩn bị. Giá và tình trạng phòng sẽ được xác nhận cho đúng ngày bạn chọn.</p><LinkButton to="/rooms" variant="secondary">Chọn lịch nghỉ <Icon name="arrow" size={17} /></LinkButton><small>Chưa mở đặt phòng trực tuyến.</small></div></div>
+    </section>
+    <section className="stay-values"><div className="home-section"><div className="section-heading"><div><p className="eyebrow">THOUGHTFULLY SIMPLE</p><h2>Mọi điều cần thiết, rõ ràng hơn.</h2></div></div><div className="value-grid">
+      <div><Icon name="bed" size={29} /><h3>Chọn không gian phù hợp</h3><p>Khám phá theo loại phòng. Thông tin sức chứa và tiện nghi được trình bày cùng nhau.</p></div>
+      <div><Icon name="shield" size={29} /><h3>Hiểu rõ kỳ nghỉ của bạn</h3><p>Xem giá và ưu đãi được xác nhận trước khi quyết định giữ chỗ, thanh toán.</p></div>
+      <div><Icon name="sparkle" size={29} /><h3>Gắn bó thêm đặc quyền</h3><p>Tích lũy từ những kỳ nghỉ hoàn tất, nhận ưu đãi theo hạng thành viên.</p></div>
+    </div></div></section>
+    <section className="home-section membership-section" id="membership"><div className="section-heading"><div><p className="eyebrow">A LITTLE MORE, JUST FOR YOU</p><h2>Mỗi lần trở lại, thêm một đặc quyền.</h2></div><Link className="text-link" to={user ? '/account' : '/register'}>{user ? 'Xem tài khoản' : 'Tham gia thành viên'}<Icon name="arrow" size={17} /></Link></div>
+      <MembershipBenefits /><p className="membership-note"><Icon name="info" size={15} />Mỗi 10.000 ₫ chi tiêu hợp lệ được 1 điểm, ghi nhận khi kỳ nghỉ đã thanh toán và hoàn tất; không tính khoản hoàn tiền.</p>
+    </section>
+    <section className="home-section closing-note"><span className="eyebrow">YOUR STAY STARTS HERE</span><h2>Một kỳ nghỉ tốt đẹp.<br />Bắt đầu từ một lựa chọn nhỏ.</h2><LinkButton to="/rooms">Lên kế hoạch kỳ nghỉ <Icon name="arrow" size={18} /></LinkButton></section>
   </>
 }

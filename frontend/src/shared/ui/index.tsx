@@ -4,6 +4,9 @@ import { Link } from 'react-router-dom'
 import { Icon } from './Icon'
 import type { IconName } from './Icon'
 
+export { Select, Tabs, Skeleton, PriceDisplay, DataTable, Pagination } from './primitives'
+export { Dialog, ConfirmDialog, ToastProvider, useToast } from './Feedback'
+
 type Variant = 'primary' | 'secondary' | 'ghost'
 type Tone = 'neutral' | 'success' | 'warning' | 'danger'
 

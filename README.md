@@ -1,5 +1,7 @@
 # Hotel PMS Mini
 
+> Bản sửa ổn định Sprint 1 đã qua backend verify cùng frontend lint/test/build. Nghiệp vụ còn WIP được ghi trong [hướng dẫn đồng bộ và chạy Sprint 2](docs/sprint1-stabilization.md). PR từ `fix/sprint1-integration-stabilization` cần được review và merge vào `dev` trước khi cả nhóm pull baseline mới.
+
 Monorepo cho đồ án quản lý một khách sạn. Nguyễn Ngọc Bảo Long phụ trách kỹ thuật và tích hợp. Kế hoạch chia 4 sprint, 5 thành viên; ưu tiên hoàn thành các việc P0 trước.
 
 ## Cấu trúc
@@ -22,7 +24,7 @@ docs/                    Quy ước kiến trúc, API, cộng tác
 compose.yaml             PostgreSQL cho local
 ```
 
-Backend đã có entity tài khoản, đăng ký/đăng nhập JWT và `/api/v1/auth/me`. Frontend đã có layout responsive, component chung, đăng ký/đăng nhập nối API thật, phiên đăng nhập và menu theo vai trò. Xem [hướng dẫn frontend](frontend/README.md) để nhóm tiếp tục theo cùng mẫu và [hợp đồng API Auth](docs/auth.md). Các trang phòng/booking/vận hành hiện là khung chờ API nghiệp vụ.
+Backend đã có entity tài khoản, đăng ký/đăng nhập JWT và `/api/v1/auth/me`. Frontend có hai cổng responsive cho khách và Staff/Admin, trang chủ với ảnh concept, chọn lịch/số khách, tài khoản, chính sách thành viên, lịch theo tuần và bộ component chung. Auth nối API thật, JWT và menu theo vai trò. Xem [hướng dẫn frontend](frontend/README.md), [nhật ký redesign](docs/frontend-redesign.md) và [hợp đồng API Auth](docs/auth.md). Dữ liệu phòng/booking/loyalty/báo cáo cùng các thao tác ghi nghiệp vụ còn chờ API tương ứng.
 
 ## Chạy local
 
@@ -35,13 +37,15 @@ Yêu cầu: Java 21+, Node.js 22.12+, Docker Compose. Repo có Maven Wrapper nê
 
 Backend mặc định dùng `jdbc:postgresql://localhost:5432/hotel_pms`, user `hotel_pms`, password `hotel_pms_dev`. Có thể đổi qua `DB_URL`, `DB_USER`, `DB_PASSWORD`. File `.env` ở gốc dành cho Compose; backend đọc biến môi trường của terminal chạy Java. Frontend dev server proxy `/api` và `/actuator` sang backend. Khi dùng API ở host khác, đặt `VITE_API_BASE_URL` trong `frontend/.env.local`.
 
+Không có Docker/PostgreSQL: đặt `$env:DB_EMBEDDED='true'` trong PowerShell backend rồi chạy profile `dev` như trên. Embedded PostgreSQL tự chọn port trống (đổi bằng `DEV_POSTGRES_PORT`), tạo dữ liệu tạm mới mỗi lần chạy; API vẫn ở port 8080. Muốn lưu dữ liệu qua các lần chạy, dùng Compose hoặc PostgreSQL riêng. Xem [hướng dẫn chi tiết và cách chạy test](docs/sprint1-stabilization.md).
+
 Profile `dev` tạo ba tài khoản: `customer@hotel-pms.test`, `staff@hotel-pms.test`, `admin@hotel-pms.test`; mật khẩu demo chung là `HotelPmsDemo123!`. Có thể đổi bằng `DEMO_SEED_PASSWORD` trước lần seed đầu tiên, hoặc tắt bằng `DEMO_SEED_ENABLED=false`. Seeder không ghi đè tài khoản đã tồn tại. Ngoài `dev`, phải cung cấp `JWT_SECRET` ngẫu nhiên dài ít nhất 32 ký tự; không có mật khẩu hay signing key mặc định cho môi trường đó.
 
 ## Kiểm tra trước PR
 
 ```text
 backend:  ./mvnw verify       (Windows: .\mvnw.cmd verify)
-frontend: npm ci && npm run build
+frontend: npm ci && npm run lint && npm test && npm run build
 ```
 
 Backend test dùng PostgreSQL 17 tạm thời qua embedded-postgres, tự khởi động và dừng nên không cần Docker để chạy test. CI dùng PostgreSQL service qua `TEST_DB_URL`, `TEST_DB_USER`, `TEST_DB_PASSWORD`. Các test kiểm tra migration, entity, seed, đăng ký/đăng nhập, email trùng đồng thời và token sai/hết hạn. Cần mạng ở lần đầu để Maven tải thư viện và binary PostgreSQL.

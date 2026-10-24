@@ -77,10 +77,10 @@ JWT ký HS256 và chỉ chứa `sub` (ID user), `roles`, `iss`, `iat`, `exp`; kh
 | 401 | `UNAUTHORIZED` | Yêu cầu đăng nhập lại; token thiếu/sai/hết hạn hoặc tài khoản bị khóa |
 | 403 | `FORBIDDEN` | Báo không đủ quyền |
 
-`GUEST` là người chưa đăng nhập, không có row user/role và không nhận JWT. Các vai trò tài khoản là `CUSTOMER`, `STAFF`, `ADMIN`. M1-05 sẽ bổ sung quy tắc RBAC cho API nghiệp vụ; hiện các route ngoài health và ba API Auth trên vẫn bị từ chối.
+`GUEST` là người chưa đăng nhập, không có row user/role và không nhận JWT. Các vai trò tài khoản là `CUSTOMER`, `STAFF`, `ADMIN`. M1-05 đã bật method security và kiểm tra ownership tại `AuthService.me`, kèm policy role/ownership tái sử dụng. Các route ngoài health và ba API Auth trên vẫn bị từ chối; RBAC cho API nghiệp vụ đang chờ module tương ứng. Xem [bảng quyền và bàn giao M1-04/M1-05](m1-sprint1-handover.md).
 
 ## Kiểm thử
 
 Chuyển vào thư mục `backend`, chạy `./mvnw verify` (Windows: `.\mvnw.cmd verify`). Test khởi động PostgreSQL thật và HTTP server ở port ngẫu nhiên, chạy Flyway V1 rồi Hibernate `validate`. Test không sửa database local đang phát triển; chỉ khi đặt `TEST_DB_URL` thì nó dùng database test bên ngoài. Database test bên ngoài phải là DB riêng vì bộ test tạo dữ liệu tài khoản.
 
-Không sửa migration V1 đã chia sẻ. Entity `User`, `Role`, `CustomerProfile` map đúng schema hiện có; `LoyaltyTier` mới chỉ định nghĩa ba tên tier, quy tắc tính điểm/discount thuộc M1-04.
+Không sửa migration V1 đã chia sẻ. Entity `User`, `Role`, `CustomerProfile` map đúng schema hiện có. M1-04 đã có `LoyaltyService` và DTO `MembershipBenefits` để tính tier/điểm/discount bằng BigDecimal; việc ghi nhận điểm sau booking đã thanh toán và `COMPLETED` thuộc M1-06. Xem [contract và hướng dẫn tích hợp](m1-sprint1-handover.md).

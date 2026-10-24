@@ -59,18 +59,17 @@ public class BookingController {
     @PostMapping("/{bookingCode}/cancel")
     public BookingResponse cancelBooking(
             @PathVariable String bookingCode,
-            @AuthenticationPrincipal Jwt jwt,
-            Authentication authentication
+            @AuthenticationPrincipal Jwt jwt
     ) {
         Long callerUserId = Long.valueOf(jwt.getSubject());
-        boolean isStaffOrAdmin = authentication.getAuthorities().stream()
-                .anyMatch(a -> "ROLE_STAFF".equals(a.getAuthority()) || "ROLE_ADMIN".equals(a.getAuthority()));
-
-        return bookingService.cancelBooking(bookingCode, callerUserId, isStaffOrAdmin);
+        // This is the Customer write route, including accounts that also have an operational role.
+        return bookingService.cancelBooking(bookingCode, callerUserId, false);
     }
 
     @PostMapping("/{bookingCode}/confirm")
-    public BookingResponse confirmBooking(@PathVariable String bookingCode) {
+    public BookingResponse confirmBooking(@PathVariable String bookingCode, @AuthenticationPrincipal Jwt jwt) {
+        // Authorize the persisted owner before any state change. Payment verification belongs to M4-03.
+        bookingService.getBookingByCode(bookingCode, Long.valueOf(jwt.getSubject()), false);
         return bookingService.confirmBooking(bookingCode);
     }
 

@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -22,6 +23,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import tools.jackson.databind.ObjectMapper;
 
 @Configuration
+@EnableMethodSecurity
 public class SecurityConfig {
 
     @Bean
@@ -39,7 +41,28 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/me").authenticated()
-                        .requestMatchers("/api/v1/bookings/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/rooms", "/api/v1/rooms/{id}").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/pricing/quote").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/admin/room-blocks", "/api/v1/admin/room-blocks/{id}")
+                            .hasAnyRole("STAFF", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/admin/room-blocks").hasAnyRole("STAFF", "ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/admin/room-blocks/{id}").hasAnyRole("STAFF", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/admin/rooms/types", "/api/v1/admin/rooms/physical",
+                                "/api/v1/admin/rooms/physical/{id}").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/admin/rooms/types", "/api/v1/admin/rooms/physical")
+                            .hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/admin/rooms/types/{id}", "/api/v1/admin/rooms/physical/{id}")
+                            .hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/admin/rooms/types/{id}", "/api/v1/admin/rooms/physical/{id}")
+                            .hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/bookings").hasRole("CUSTOMER")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/bookings").hasRole("CUSTOMER")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/bookings/{bookingCode}")
+                            .hasAnyRole("CUSTOMER", "STAFF", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/bookings/{bookingCode}/cancel",
+                                "/api/v1/bookings/{bookingCode}/confirm").hasRole("CUSTOMER")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/bookings/{bookingCode}/complete")
+                            .hasAnyRole("STAFF", "ADMIN")
                         .anyRequest().denyAll())
                 .exceptionHandling(errors -> errors
                         .authenticationEntryPoint((request, response, exception) ->

@@ -22,11 +22,24 @@ import { Icon } from '../../shared/ui/Icon'
 type Step = 'SEARCH' | 'HOLD' | 'CONFIRMED'
 type ActiveTab = 'BOOKING' | 'MY_BOOKINGS'
 
-export function BookingPage() {
+export function BookingSteps() {
+  return (
+    <ol className="booking-steps" aria-label="Tiến trình đặt phòng">
+      {['Chọn phòng', 'Xem lại', 'Thanh toán', 'Xác nhận'].map((step, index) => (
+        <li key={step} aria-current={index === 0 ? 'step' : undefined}>
+          <span>{index + 1}</span>
+          {step}
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab } = {}) {
   const { user } = useAuth()
 
   // Navigation Tabs: 'BOOKING' | 'MY_BOOKINGS'
-  const [activeTab, setActiveTab] = useState<ActiveTab>('BOOKING')
+  const [activeTab, setActiveTab] = useState<ActiveTab>(initialTab)
 
   // Booking Flow Steps: 'SEARCH' (1) -> 'HOLD' (2) -> 'CONFIRMED' (3)
   const [step, setStep] = useState<Step>('SEARCH')
@@ -216,10 +229,16 @@ export function BookingPage() {
   return (
     <div className="booking-container">
       <PageHeader
-        eyebrow="KỲ NGHỈ CỦA BẠN"
-        title="Tìm và đặt phòng"
-        description="Lựa chọn phòng nghỉ, giữ chỗ tạm thời trong 15 phút và thanh toán an toàn."
+        eyebrow="YOUR NEXT STAY"
+        title="Kỳ nghỉ bắt đầu từ đây."
+        description="Chọn loại phòng, nhận báo giá tức thì và giữ chỗ an toàn trong 15 phút."
+        action={
+          <Link to="/rooms" className="button button--secondary">
+            <Icon name="bed" size={16} /> Danh mục phòng
+          </Link>
+        }
       />
+      <BookingSteps />
 
       {/* Main Tabs */}
       <div className="booking-tabs" role="tablist" aria-label="Phân loại chức năng đặt phòng">
@@ -932,4 +951,9 @@ export function BookingPage() {
       )}
     </div>
   )
+}
+
+
+export function MyBookingsPage() {
+  return <BookingPage initialTab="MY_BOOKINGS" />
 }

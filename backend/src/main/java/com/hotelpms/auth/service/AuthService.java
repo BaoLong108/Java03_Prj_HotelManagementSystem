@@ -17,6 +17,7 @@ import java.util.Locale;
 import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -68,6 +69,7 @@ public class AuthService {
     }
 
     @Transactional(readOnly = true)
+    @PreAuthorize("isAuthenticated() and @authorizationPolicy.isCurrentUser(authentication, #p0)")
     public UserResponse me(Long userId) {
         User user = users.findById(userId).filter(User::isActive)
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED,
