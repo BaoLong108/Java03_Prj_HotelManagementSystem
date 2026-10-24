@@ -72,7 +72,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
 
   return <div className="auth-layout">
     <section className="auth-story"><img src={courtyard} alt="Không gian sân vườn khách sạn minh họa" className="auth-story-image" /><span className="eyebrow light">A LITTLE SPACE. A BETTER STAY.</span>
-      <h2 className="auth-story-title">Mỗi chuyến đi,<br />một khởi đầu mới.</h2>
+      <h2 className="auth-story-title">Mỗi chuyến đi, <br />một khởi đầu mới.</h2>
       <p>Tìm không gian nghỉ ngơi phù hợp và quản lý kỳ nghỉ của bạn ở cùng một nơi.</p>
       <div className="story-footer"><Icon name="sparkle" size={22} /><span>Những kỳ nghỉ đáng nhớ.<br />Những đặc quyền dành riêng.</span></div>
     </section>
