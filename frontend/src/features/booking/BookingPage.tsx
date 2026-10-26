@@ -3,6 +3,7 @@ import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { readStay, validDate } from '../rooms/search'
 import { useAuth } from '../auth/AuthProvider'
 import { bookingApi } from './api'
+import { formatHoldTime, holdSecondsRemaining } from './hold'
 import {
   bookingStatusLabels,
   bookingStatusTones,
@@ -16,11 +17,12 @@ import {
 } from './types'
 import type { BookingResponse, PriceQuote, RoomType } from './types'
 import { errorMessage } from '../../shared/api/client'
-import { Alert, Badge, Button, Card, EmptyState, Field, PageHeader } from '../../shared/ui'
+import { Alert, Badge, Button, Card, EmptyState, Field, LoadingState, PageHeader } from '../../shared/ui'
 import { Icon } from '../../shared/ui/Icon'
 
 type Step = 'SEARCH' | 'HOLD' | 'CONFIRMED'
 type ActiveTab = 'BOOKING' | 'MY_BOOKINGS'
+const EMPTY_ROOMS: RoomType[] = []
 
 export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab } = {}) {
   const { user } = useAuth()
@@ -43,11 +45,15 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
   const [guestCount, setGuestCount] = useState<number>(initialStay.adults + initialStay.children)
 
   // Room Catalog
-  const [roomTypes, setRoomTypes] = useState<RoomType[]>([])
   const [selectedRoomId, setSelectedRoomId] = useState<number>(0)
-  const [loadingRooms, setLoadingRooms] = useState(false)
+  const [searchRetry, setSearchRetry] = useState(0)
+  const searchKey = `${checkInDate}|${checkOutDate}|${guestCount}|${searchRetry}`
+  const [availability, setAvailability] = useState<{ key: string; rooms?: RoomType[]; error?: string }>({ key: '' })
+  const currentAvailability = availability.key === searchKey ? availability : { key: searchKey }
+  const roomTypes = currentAvailability.rooms ?? EMPTY_ROOMS
+  const loadingRooms = !currentAvailability.rooms && !currentAvailability.error
 
-  // Member Tier Simulation
+  // Quote and member tier come from the server.
   const [quoteResponse, setQuoteResponse] = useState<(PriceQuote & { appliedTier: string; key: string }) | null>(null)
 
   // Active Booking & Async State
@@ -60,24 +66,24 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
   const [loadingMyBookings, setLoadingMyBookings] = useState(false)
 
   // Countdown Timer State for Hold (15 minutes)
-  const [remainingSeconds, setRemainingSeconds] = useState<number>(0)
+  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null)
+  const [holdRetry, setHoldRetry] = useState(0)
+  const [holdSync, setHoldSync] = useState<{ code: string; loading: boolean; error?: string }>({ code: '', loading: false })
 
   // Search real availability; abort stale date/guest requests.
   useEffect(() => {
     const controller = new AbortController()
-    setLoadingRooms(true)
     setActionError(null)
     bookingApi.search({ roomTypeId: 0, guestCount, startAt: toCheckInIso(checkInDate), endAt: toCheckOutIso(checkOutDate) }, controller.signal)
       .then(data => {
         if (!controller.signal.aborted) {
-          setRoomTypes(data)
+          setAvailability({ key: searchKey, rooms: data })
           setSelectedRoomId(previous => data.some(room => room.id === previous) ? previous : data[0]?.id ?? 0)
         }
       })
-      .catch(error => { if (!controller.signal.aborted) { setRoomTypes([]); setActionError(errorMessage(error)) } })
-      .finally(() => { if (!controller.signal.aborted) setLoadingRooms(false) })
+      .catch(error => { if (!controller.signal.aborted) setAvailability({ key: searchKey, error: errorMessage(error) }) })
     return () => controller.abort()
-  }, [checkInDate, checkOutDate, guestCount])
+  }, [checkInDate, checkOutDate, guestCount, searchKey])
 
   // Load My Bookings when switching to tab or after state change
   const fetchMyBookings = () => {
@@ -99,19 +105,13 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
   // Timer logic for HOLD step
   useEffect(() => {
     if (step !== 'HOLD' || !currentBooking?.holdExpiresAt) {
-      setRemainingSeconds(0)
+      setRemainingSeconds(null)
       return
     }
 
     const updateTimer = () => {
-      const expiry = new Date(currentBooking.holdExpiresAt).getTime()
-      const now = Date.now()
-      const diffSec = Math.max(0, Math.floor((expiry - now) / 1000))
-      setRemainingSeconds(diffSec)
-
-      if (diffSec <= 0) {
-        setCurrentBooking((prev) => (prev ? { ...prev, status: 'EXPIRED' } : null))
-      }
+      setRemainingSeconds(holdSecondsRemaining(currentBooking.holdExpiresAt))
+      // The countdown is presentation only; booking status is owned by the backend.
     }
 
     updateTimer()
@@ -119,12 +119,49 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
     return () => clearInterval(interval)
   }, [step, currentBooking?.holdExpiresAt])
 
+  // Re-read on entry, periodically, and when returning to a suspended tab.
+  // Never turn a clock deadline into a locally invented booking status.
+  const pendingHoldCode = step === 'HOLD' && currentBooking?.status === 'PENDING_PAYMENT'
+    ? currentBooking.bookingCode : undefined
+  const holdDeadlineReached = remainingSeconds === 0
+  useEffect(() => {
+    const code = pendingHoldCode
+    if (!code) return
+    const controller = new AbortController()
+    let inFlight = false
+    const refresh = async () => {
+      if (inFlight || controller.signal.aborted) return
+      inFlight = true
+      setHoldSync({ code, loading: true })
+      try {
+        const latest = await bookingApi.getByCode(code, controller.signal)
+        if (controller.signal.aborted) return
+        setCurrentBooking(previous => previous?.bookingCode === latest.bookingCode && previous.status === 'PENDING_PAYMENT' ? latest : previous)
+        if (latest.status === 'CONFIRMED' || latest.status === 'COMPLETED') setStep('CONFIRMED')
+        setHoldSync({ code, loading: false })
+      } catch (error) {
+        if (!controller.signal.aborted) setHoldSync({ code, loading: false, error: errorMessage(error) })
+      } finally { inFlight = false }
+    }
+    void refresh()
+    const interval = setInterval(() => void refresh(), 5000)
+    const onVisible = () => { if (document.visibilityState === 'visible') void refresh() }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+    return () => {
+      controller.abort()
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
+    }
+  }, [pendingHoldCode, holdRetry, holdDeadlineReached])
+
   const selectedRoom = useMemo<RoomType>(() =>
     roomTypes.find(room => room.id === selectedRoomId) ?? roomTypes[0] ??
     { id: 0, code: '', name: 'Chưa có phòng phù hợp', maxOccupancy: 0, basePricePerNight: 0 },
   [roomTypes, selectedRoomId])
-  const quoteKey = `${selectedRoom.id}|${checkInDate}|${checkOutDate}|${guestCount}|${user?.id ?? 'guest'}`
-  const quoteReady = quoteResponse?.key === quoteKey
+  const quoteKey = `${selectedRoom.id}|${searchKey}|${user?.id ?? 'guest'}`
+  const quoteReady = !loadingRooms && quoteResponse?.key === quoteKey
   const quote: PriceQuote = quoteReady ? quoteResponse : {
     roomType: selectedRoom, guestCount, nights: 0, baseAmount: 0, discountRate: 0, discountAmount: 0, payableAmount: 0,
   }
@@ -218,15 +255,16 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
   }
 
   // Formatted countdown timer display (MM:SS)
-  const timerMinutes = Math.floor(remainingSeconds / 60)
-  const timerSeconds = remainingSeconds % 60
-  const formattedCountdown = `${String(timerMinutes).padStart(2, '0')}:${String(timerSeconds).padStart(2, '0')}`
-  const isUrgent = remainingSeconds > 0 && remainingSeconds <= 180 // < 3 mins
-  const isExpired = remainingSeconds <= 0 && step === 'HOLD'
-  const progressPercent = Math.min(100, Math.max(0, (remainingSeconds / (15 * 60)) * 100))
+  const formattedCountdown = remainingSeconds === null ? '—' : formatHoldTime(remainingSeconds)
+  const isUrgent = remainingSeconds !== null && remainingSeconds > 0 && remainingSeconds <= 180
+  const isExpired = currentBooking?.status === 'EXPIRED'
+  const holdUnavailable = isExpired || remainingSeconds === null || remainingSeconds === 0
+  const syncingHold = pendingHoldCode !== undefined && (holdSync.code !== pendingHoldCode || holdSync.loading)
+  const holdSyncError = holdSync.code === pendingHoldCode ? holdSync.error : undefined
+  const progressPercent = Math.min(100, Math.max(0, ((remainingSeconds ?? 0) / (15 * 60)) * 100))
 
   // Occupancy & Date validation
-  const exceedsOccupancy = guestCount > selectedRoom.maxOccupancy
+  const exceedsOccupancy = selectedRoom.id !== 0 && guestCount > selectedRoom.maxOccupancy
   const isInvalidDates = checkOutDate <= checkInDate
 
   return (
@@ -235,8 +273,11 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
         <Button variant="secondary" onClick={() => bookingApi.downloadConfirmation(currentBooking.bookingCode).catch(error => setActionError(errorMessage(error)))}>
           Tải PDF xác nhận
         </Button>}
-      {!loadingRooms && roomTypes.length === 0 && <Alert>Không có phòng phù hợp trong khoảng đã chọn. Bạn có thể đổi ngày hoặc số khách.</Alert>}
-      {!quoteReady && selectedRoom.id !== 0 && <Alert tone="warning">Đang lấy báo giá từ máy chủ. Chưa thể giữ phòng.</Alert>}
+      {activeTab === 'BOOKING' && step === 'SEARCH' && <>
+        {currentAvailability.rooms?.length === 0 && <Alert>Không có phòng phù hợp trong khoảng đã chọn. Bạn có thể đổi ngày hoặc số khách.</Alert>}
+        {currentAvailability.error && <Alert tone="danger">{currentAvailability.error} <Button variant="secondary" onClick={() => setSearchRetry(value => value + 1)}>Thử lại tìm phòng</Button></Alert>}
+        {!quoteReady && selectedRoom.id !== 0 && !currentAvailability.error && <Alert tone="warning">Đang lấy báo giá từ máy chủ. Chưa thể giữ phòng.</Alert>}
+      </>}
       <PageHeader
         eyebrow="YOUR NEXT STAY"
         title="Kỳ nghỉ bắt đầu từ đây."
@@ -377,7 +418,8 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
                     </Badge>
                   </div>
 
-                  <div className="room-selection-list">
+                  <div className="room-selection-list" aria-busy={loadingRooms}>
+                    {loadingRooms && <LoadingState message="Đang tìm phòng trống…" />}
                     {roomTypes.map((room) => {
                       const isSelected = room.id === selectedRoomId
                       const iconTone =
@@ -463,7 +505,7 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
                     <div className="quote-rows">
                       <div className="quote-row">
                         <span className="muted">Thời gian lưu trú</span>
-                        <strong>{quote.nights} đêm</strong>
+                        <strong>{quoteReady ? `${quote.nights} đêm` : '—'}</strong>
                       </div>
 
                       <div className="quote-row">
@@ -478,7 +520,7 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
 
                       <div className="quote-row">
                         <span className="muted">Tổng tiền phòng gốc</span>
-                        <strong>{formatVnd(quote.baseAmount)}</strong>
+                        <strong>{quoteReady ? formatVnd(quote.baseAmount) : '—'}</strong>
                       </div>
 
                       {/* Tier Selection Preview */}
@@ -515,7 +557,7 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
                     {/* Total Payable */}
                     <div className="quote-total">
                       <span>Tổng tạm tính</span>
-                      <strong>{formatVnd(quote.payableAmount)}</strong>
+                      <strong>{quoteReady ? formatVnd(quote.payableAmount) : '—'}</strong>
                     </div>
 
                     {/* Member savings notice */}
@@ -584,16 +626,16 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
           {step === 'HOLD' && currentBooking && (
             <Card className="hold-card">
               <div className="hold-header">
-                <Badge tone="warning">ĐANG GIỮ CHỖ TẠM THỜI</Badge>
+                <Badge tone={bookingStatusTones[currentBooking.status]}>{currentBooking.status === 'PENDING_PAYMENT' ? 'ĐANG GIỮ CHỖ TẠM THỜI' : bookingStatusLabels[currentBooking.status]}</Badge>
                 <h2>Đơn đặt phòng #{currentBooking.bookingCode}</h2>
                 <p className="muted">
-                  Phòng của bạn đang được hệ thống giữ chỗ độc quyền trong 15 phút.
+                  Thời hạn và trạng thái giữ chỗ được xác định bởi máy chủ.
                 </p>
               </div>
 
               {/* Countdown Timer Display */}
               <div
-                className={`hold-timer-box ${isUrgent ? 'urgent' : ''} ${isExpired ? 'expired' : ''}`}
+                className={`hold-timer-box ${isUrgent ? 'urgent' : ''} ${holdUnavailable ? 'expired' : ''}`}
               >
                 <span className="small muted">THỜI GIAN GIỮ PHÒNG CÒN LẠI</span>
                 <div className="hold-timer-digits">
@@ -606,13 +648,17 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
                   />
                 </div>
                 <span className="small" style={{ marginTop: '8px' }}>
-                  {isExpired
-                    ? 'Thời gian giữ phòng đã kết thúc.'
+                  {holdUnavailable
+                    ? 'Chưa thể thanh toán. Vui lòng kiểm tra trạng thái từ máy chủ.'
                     : isUrgent
                       ? '⚠️ Sắp hết hạn giữ chỗ! Vui lòng hoàn tất thanh toán.'
                       : 'Hạn giữ phòng: 15 phút kể từ lúc đặt'}
                 </span>
               </div>
+
+              {syncingHold && <LoadingState message="Đang kiểm tra trạng thái giữ chỗ…" />}
+              {holdSyncError && <Alert tone="danger">{holdSyncError}</Alert>}
+              {pendingHoldCode && (holdUnavailable || holdSyncError) && <Button variant="secondary" busy={syncingHold} onClick={() => setHoldRetry(value => value + 1)}>Kiểm tra lại trạng thái</Button>}
 
               {/* Booking Details Summary */}
               <div className="booking-details-box">
@@ -666,10 +712,15 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
               </div>
 
               {/* Action Buttons */}
-              {isExpired ? (
+              {currentBooking.status === 'CANCELLED' ? (
+                <div style={{ textAlign: 'center' }}>
+                  <Alert tone="neutral">Đơn đặt phòng này đã được hủy thành công.</Alert>
+                  <Button variant="primary" onClick={() => { setCurrentBooking(null); setStep('SEARCH') }}>Đặt phòng khác</Button>
+                </div>
+              ) : holdUnavailable ? (
                 <div style={{ textAlign: 'center' }}>
                   <Alert tone="danger">
-                    Đơn đặt phòng này đã hết hạn 15 phút. Phòng vật lý đã được giải phóng tự động để phục vụ khách hàng khác.
+                    {isExpired ? 'Máy chủ xác nhận đơn đặt phòng đã hết hạn. Vui lòng chọn phòng mới.' : 'Không còn thời gian giữ chỗ hợp lệ để thanh toán. Trạng thái booking sẽ được cập nhật từ máy chủ.'}
                   </Alert>
                   <Button
                     variant="primary"
@@ -682,25 +733,13 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
                     Đặt phòng mới
                   </Button>
                 </div>
-              ) : currentBooking.status === 'CANCELLED' ? (
-                <div style={{ textAlign: 'center' }}>
-                  <Alert tone="neutral">Đơn đặt phòng này đã được hủy thành công.</Alert>
-                  <Button
-                    variant="primary"
-                    onClick={() => {
-                      setCurrentBooking(null)
-                      setStep('SEARCH')
-                    }}
-                  >
-                    Đặt phòng khác
-                  </Button>
-                </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <Button
                     variant="primary"
                     className="button--full"
                     busy={busy}
+                    disabled={syncingHold || Boolean(holdSyncError) || currentBooking.status !== 'PENDING_PAYMENT'}
                     onClick={() => handleConfirmPayment(currentBooking.bookingCode)}
                   >
                     <Icon name="check" size={18} />
@@ -759,7 +798,7 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
                   <div>
                     <dt>Trạng thái</dt>
                     <dd>
-                      <Badge tone="success">CONFIRMED · Đã xác nhận</Badge>
+                      <Badge tone="success">{currentBooking.status} · {bookingStatusLabels[currentBooking.status]}</Badge>
                     </dd>
                   </div>
                   <div>

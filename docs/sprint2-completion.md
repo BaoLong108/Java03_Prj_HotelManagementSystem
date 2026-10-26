@@ -83,3 +83,11 @@ Pull dev sau khi PR tích hợp được merge, rồi chạy PostgreSQL persiste
 4. Dùng Compose/PostgreSQL riêng để giữ dữ liệu sau restart. `DB_EMBEDDED=true` chỉ dành cho demo/test, tạo DB mới mỗi lần chạy. Không bật fixture mode để nghiệm thu API.
 
 Giới hạn đúng phạm vi: PDF dùng nhãn tiếng Anh và ghi rõ chứng từ demo; không phải hóa đơn điện tử. VNPay Sandbox, cộng điểm/nâng hạng và Analytics còn theo Sprint 3/4. Trang chi tiết phòng, quản trị đầy đủ và KPI ngoài những task S2 nêu trên vẫn theo kế hoạch tiếp theo.
+
+## Chốt Booking UI trong PR #6 — 27/10/2026
+
+Availability có loading/empty/error riêng và retry; chỉ phản hồi rỗng thành công mới hiện hết phòng. Key theo ngày/số khách/lượt retry và AbortController loại phản hồi cũ, không cho giữ phòng từ kết quả tìm cũ.
+
+Countdown tái sử dụng `hold.ts`, tính từ `holdExpiresAt` của backend và không tự gán EXPIRED. Booking được đọc lại khi vào hold, mỗi 5 giây, khi chạm hạn, khi quay lại tab hoặc bấm retry. Chỉ response backend đổi trạng thái; lỗi đọc trạng thái chặn thanh toán và cho thử lại. Rời hold hủy request và bỏ kết quả đến muộn.
+
+Thêm 8 test DOM cho component thật bằng jsdom (chỉ devDependency). Lượt kiểm tra cuối: 11/11 tests tập trung (BookingPage + hold), toàn frontend 69/69 PASS, lint/build PASS. Backend không đổi trong lượt này; CI revision `114e847` đã xác nhận 235/235 PASS. Kết quả CI revision cuối xem trực tiếp [PR #6](https://github.com/BaoLong108/Java03_Prj_HotelManagementSystem/pull/6). PR giữ mở để Long review/duyệt merge; không tự merge dev.
