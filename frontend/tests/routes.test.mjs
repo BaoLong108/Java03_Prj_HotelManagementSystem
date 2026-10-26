@@ -48,11 +48,11 @@ test('authenticated header shows name/logout and hides login/register menu', () 
   assert.ok(!html.includes('href="/login"') && !html.includes('href="/register"'))
 })
 test('staff and multi-role users see dedicated menu and honest placeholders', () => {
-  const pages = [
-    ['/staff/calendar', 'Một góc nhìn cho cả tuần', 'Lịch phòng chưa có dữ liệu xác thực'],
-    ['/staff/bookings', 'Quản lý đặt phòng', 'Chưa thể tải đặt phòng'],
-  ]
   for (const roles of [['STAFF'], ['ADMIN'], ['CUSTOMER', 'STAFF'], ['CUSTOMER', 'ADMIN']]) {
+    const pages = [
+      ['/staff/calendar', 'Lịch phòng', roles.includes('ADMIN') ? 'Đang tải lịch phòng' : 'Chưa tải được danh sách phòng cho STAFF'],
+      ['/staff/bookings', 'Tra cứu booking', 'Nhập mã booking để bắt đầu.'],
+    ]
     for (const [path, heading, unavailable] of pages) {
       const html = render(path, roles)
       assert.ok(html.includes('Điều hướng nhân viên'))
@@ -64,7 +64,7 @@ test('staff and multi-role users see dedicated menu and honest placeholders', ()
 test('anonymous/CUSTOMER cannot render staff content; cached roles do not bypass loading', () => {
   for (const roles of [null, ['CUSTOMER']]) {
     assert.ok(!render('/staff/calendar', roles).includes('Điều hướng nhân viên'))
-    assert.ok(!render('/staff/bookings', roles).includes('Chưa thể tải đặt phòng'))
+    assert.ok(!render('/staff/bookings', roles).includes('Nhập mã booking để bắt đầu.'))
     assert.ok(!render('/staff/calendar', roles).includes('Lịch phòng chưa có dữ liệu xác thực'))
   }
   assert.ok(!render('/staff/calendar', ['ADMIN'], 'loading').includes('Điều hướng nhân viên'))

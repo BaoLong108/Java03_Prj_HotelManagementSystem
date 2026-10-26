@@ -1,0 +1,26 @@
+.booking-search-page { min-width: 0; }
+.booking-search-form { display: grid; grid-template-columns: minmax(140px, .6fr) minmax(180px, 1.4fr) auto; gap: 18px; align-items: start; }
+.booking-search-form > .button { margin-top: 22px; }
+.booking-search-form .field label { font-size: 12px; }
+.booking-search-note { margin: 18px 0; font-size: 12px; color: var(--muted); }
+.booking-result-count { margin: 24px 0 14px; font-weight: 600; }
+.booking-results { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 390px), 1fr)); gap: 18px; }
+.booking-result-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.booking-result h2 { font-size: 17px; overflow-wrap: anywhere; }
+.booking-result dl { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 24px 0; }
+.booking-result dl > div { min-width: 0; }
+.booking-result dt { font-size: 11px; color: var(--muted); }
+.booking-result dd { margin: 6px 0 0; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.booking-result .booking-payable { font-size: 17px; font-weight: 650; color: var(--primary); }
+.booking-result > .text-link { font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.booking-status { display: inline-block; border: 1px solid; border-radius: 5px; padding: 5px 9px; font-size: 11px; }
+.booking-status--confirmed { color: #17564f; background: #dceee9; }
+.booking-status--completed { color: #454d7c; background: #e7eaf5; }
+.booking-status--pending_payment { color: #79530c; background: #fff0cd; border-style: dashed; }
+.booking-status--cancelled { color: #87363d; background: #f7dfdf; }
+.booking-status--expired { color: #52636b; background: #ebeff1; }
+@media (max-width: 620px) {
+  .booking-search-form { grid-template-columns: 1fr; gap: 16px; }
+  .booking-search-form > .button { margin-top: 0; }
+  .booking-result dl { grid-template-columns: 1fr; gap: 15px; }
+}
