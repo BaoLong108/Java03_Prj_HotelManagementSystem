@@ -102,7 +102,7 @@ test('fixture lookup is exact, includes all five statuses and shares dates/codes
   assert.equal(new Set(items.map(item => item.status)).size, 5)
   assert.equal(items.find(item => item.bookingCode === 'BK-MAU-005').status, 'COMPLETED')
 })
-test('fixtures off uses real code endpoint and refuses phone search without making an HTTP request', async () => {
+test('fixtures off uses authenticated staff search for code and phone', async () => {
   const token = `header.${Buffer.from(JSON.stringify({ exp: Math.floor(Date.now()/1000) + 3600 })).toString('base64url')}.signature`
   Object.defineProperty(globalThis, 'sessionStorage', { configurable: true, value: { getItem: () => JSON.stringify({ accessToken: token, expiresAt: Date.now() + 3600000 }) } })
   const calls = []
@@ -111,12 +111,12 @@ test('fixtures off uses real code endpoint and refuses phone search without maki
     calls.push(url)
     return Response.json(url.includes('/staff/') ? fixture() : real)
   }
-  assert.equal((await api.searchBookings({ bookingCode: real.bookingCode })).items[0].bookingId, 15)
-  await assert.rejects(api.searchBookings({ phone: '+84900000123' }), error => error.code === 'PHONE_SEARCH_UNAVAILABLE')
-  assert.deepEqual(calls, ['/api/v1/bookings/BK-REAL-001'])
+  assert.equal((await api.searchBookings({ bookingCode: real.bookingCode })).items[0].bookingId, fixture().items[0].bookingId)
+  assert.ok((await api.searchBookings({ phone: '+84900000123' })).items.length > 0)
+  assert.deepEqual(calls, ['/api/v1/staff/bookings/search?bookingCode=BK-REAL-001', '/api/v1/staff/bookings/search?phone=%2B84900000123'])
 })
-test('only BOOKING_NOT_FOUND is empty; missing API, authorization, malformed and server errors never fall back to fixture', async () => {
-  globalThis.fetch = async () => Response.json({ code: 'BOOKING_NOT_FOUND', message: 'Không tìm thấy' }, { status: 404 })
+test('empty results are explicit; missing API, authorization, malformed and server errors never fall back to fixture', async () => {
+  globalThis.fetch = async () => Response.json({ items: [] })
   assert.deepEqual(await api.searchBookings({ bookingCode: 'MISSING' }), { items: [] })
   for (const [status, code] of [[404, 'NOT_FOUND'], [403, 'FORBIDDEN'], [500, 'INTERNAL_ERROR']]) {
     globalThis.fetch = async () => Response.json({ code, message: 'Lỗi máy chủ kiểm thử' }, { status })
@@ -124,6 +124,6 @@ test('only BOOKING_NOT_FOUND is empty; missing API, authorization, malformed and
       await assert.rejects(api.searchBookings(query), error => error.status === status && error.message === 'Lỗi máy chủ kiểm thử')
     }
   }
-  globalThis.fetch = async () => Response.json({ ...real, bookingCode: 'WRONG-CODE' })
+  globalThis.fetch = async () => Response.json({ items: [{}] })
   await assert.rejects(api.searchBookings({ bookingCode: real.bookingCode }), /không hợp lệ/)
 })

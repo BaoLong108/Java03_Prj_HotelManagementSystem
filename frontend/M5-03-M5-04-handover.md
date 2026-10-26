@@ -1,5 +1,7 @@
 # Bàn giao M5-04, M5-03 — tích hợp dev
 
+> Bản này lưu bằng chứng lịch sử ngày 22–23/10. Ngày 26/10, Long đã bổ sung API Staff Calendar/Lookup thật và cập nhật adapter. Trạng thái/DTO hiện tại xem [Sprint 2 completion](../docs/sprint2-completion.md); các giới hạn STAFF/phone/booking và CI cũ bên dưới đã được xử lý trong bản tích hợp.
+
 Kiểm thử local ngày **22/10/2026**, cập nhật CI ngày **23/10/2026**, múi giờ Asia/Ho_Chi_Minh. Nhánh `DatHVT-S2`, nền `origin/dev@b6bbe14`.
 
 **Frontend sẵn sàng review; chưa đủ điều kiện đóng toàn bộ M5-04/M5-03.** ADMIN xem phòng + block thật; STAFF bị giới hạn danh sách phòng từ backend. STAFF/ADMIN tra cứu mã booking thật. Lịch booking tổng hợp và tìm SĐT vẫn chờ API.

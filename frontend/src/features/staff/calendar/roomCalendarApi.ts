@@ -4,7 +4,7 @@ import { ApiError, apiRequest } from '../../../shared/api/client'
 import { USE_FIXTURES } from '../shared/fixtureMode'
 import { isBookingStatus } from '../shared/bookingStatus'
 import { isOffsetDateTime } from '../shared/staffTime'
-import type { CalendarEntry, CalendarQuery, CalendarRoom, RoomCalendar } from './roomCalendarTypes'
+import type { CalendarEntry, CalendarQuery, RoomCalendar } from './roomCalendarTypes'
 
 const record = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 const id = (value: unknown): value is number => Number.isSafeInteger(value) && Number(value) > 0
@@ -25,66 +25,38 @@ function parseEntry(raw: unknown): CalendarEntry {
     ...(isOffsetDateTime(raw.holdExpiresAt) ? { holdExpiresAt: raw.holdExpiresAt } : {}) }
 }
 
+function parseEntries(raw: unknown[]): CalendarEntry[] {
+  const entries = raw.map(parseEntry)
+  if (new Set(entries.map(entry => `${entry.kind}:${entry.id}`)).size !== entries.length) return invalid()
+  return entries
+}
+
 /** Whitelist calendar fields: customer identity is never part of this view model. */
 export function parseRoomCalendar(raw: unknown, query: CalendarQuery): RoomCalendar {
   if (!record(raw) || !isOffsetDateTime(raw.from) || !isOffsetDateTime(raw.to) || !Array.isArray(raw.rooms)
       || Date.parse(raw.from) !== Date.parse(query.from) || Date.parse(raw.to) !== Date.parse(query.to)) return invalid()
   const seen = new Set<number>()
-  return { from: raw.from, to: raw.to, rooms: raw.rooms.map(room => {
+  const rooms = raw.rooms.map(room => {
     if (!record(room) || !id(room.physicalRoomId) || seen.has(room.physicalRoomId) || !text(room.roomNumber)
         || !id(room.roomTypeId) || !text(room.roomTypeName) || typeof room.isActive !== 'boolean'
-        || !(room.floorNumber === null || Number.isInteger(room.floorNumber)) || !Array.isArray(room.entries)) return invalid()
+        || !(room.floorNumber === null || Number.isInteger(room.floorNumber)) || !Array.isArray(room.entries)
+        || (query.roomTypeId !== undefined && room.roomTypeId !== query.roomTypeId)) return invalid()
     seen.add(room.physicalRoomId)
     return { physicalRoomId: room.physicalRoomId, roomNumber: room.roomNumber, floorNumber: room.floorNumber as number | null,
-      roomTypeId: room.roomTypeId, roomTypeName: room.roomTypeName, isActive: room.isActive, entries: room.entries.map(parseEntry) }
-  }) }
+      roomTypeId: room.roomTypeId, roomTypeName: room.roomTypeName, isActive: room.isActive, entries: parseEntries(room.entries) }
+  })
+  const roomTypes = raw.roomTypes ?? Array.from(new Map(rooms.map(room => [room.roomTypeId, { id: room.roomTypeId, name: room.roomTypeName }])).values())
+  if (!Array.isArray(roomTypes) || roomTypes.some(type => !record(type) || !id(type.id) || !text(type.name))
+      || new Set(roomTypes.map(type => type.id)).size !== roomTypes.length) return invalid()
+  return { from: raw.from, to: raw.to, rooms, roomTypes: roomTypes.map(type => ({ id: type.id, name: type.name })) }
 }
 
 /** Compose existing dev endpoints without inferring availability or synthesizing bookings. */
 export async function getRealRoomCalendar(query: CalendarQuery, signal?: AbortSignal): Promise<RoomCalendar> {
-  const rawTypes = await apiRequest<unknown>('/api/v1/admin/rooms/types', { signal })
-  if (!Array.isArray(rawTypes)) return invalid()
-  const typeIds = new Set<number>()
-  const roomTypes = rawTypes.map(type => {
-    if (!record(type) || !id(type.id) || typeIds.has(type.id) || !text(type.name)) return invalid()
-    typeIds.add(type.id)
-    return { id: type.id, name: type.name }
-  })
-  const selectedTypes = roomTypes.filter(type => query.roomTypeId === undefined || type.id === query.roomTypeId)
-  const groups = await Promise.all(selectedTypes.map(async type => {
-    const rawRooms = await apiRequest<unknown>(`/api/v1/admin/rooms/physical?roomTypeId=${type.id}`, { signal })
-    if (!Array.isArray(rawRooms)) return invalid()
-    return rawRooms.map((raw): CalendarRoom => {
-      if (!record(raw) || !id(raw.id) || raw.roomTypeId !== type.id || !text(raw.roomNumber)
-          || typeof raw.active !== 'boolean' || !(raw.floorNumber === null || Number.isInteger(raw.floorNumber))) return invalid()
-      return { physicalRoomId: raw.id, roomNumber: raw.roomNumber, roomTypeId: type.id, roomTypeName: type.name,
-        floorNumber: raw.floorNumber as number | null, isActive: raw.active, entries: [] }
-    })
-  }))
-  const rooms = groups.flat()
-  if (new Set(rooms.map(room => room.physicalRoomId)).size !== rooms.length) return invalid()
-  // One request per physical room, never one per day. Endpoint has no time-range filter.
-  const loaded = await Promise.all(rooms.map(async room => {
-    try {
-      const rawBlocks = await apiRequest<unknown>(`/api/v1/admin/room-blocks?roomId=${room.physicalRoomId}&history=false`, { signal })
-      if (!Array.isArray(rawBlocks)) return invalid()
-      const seen = new Set<number>()
-      const entries = rawBlocks.flatMap(raw => {
-        if (!record(raw) || raw.physicalRoomId !== room.physicalRoomId || !id(raw.id) || seen.has(raw.id)
-            || typeof raw.active !== 'boolean') return invalid()
-        seen.add(raw.id)
-        const entry = parseEntry({ ...raw, kind: 'BLOCK' })
-        return raw.active && Date.parse(entry.startAt) < Date.parse(query.to) && Date.parse(entry.endAt) > Date.parse(query.from) ? [entry] : []
-      })
-      return { ...room, entries }
-    } catch (error) {
-      signal?.throwIfAborted()
-      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) throw error
-      // Failed room remains explicitly unknown, while other rooms still render.
-      return { ...room, blockError: 'Chưa tải được khoảng chặn. Hãy tải lại.' }
-    }
-  }))
-  return { from: query.from, to: query.to, rooms: loaded, roomTypes }
+  const params = new URLSearchParams({ from: query.from, to: query.to })
+  if (query.roomTypeId !== undefined) params.set('roomTypeId', String(query.roomTypeId))
+  const raw = await apiRequest<unknown>(`/api/v1/staff/room-calendar?${params}`, { signal })
+  return parseRoomCalendar(raw, query)
 }
 
 export async function getRoomCalendar(query: CalendarQuery, signal?: AbortSignal): Promise<RoomCalendar> {

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import { readStay, validDate } from '../rooms/search'
 import { useAuth } from '../auth/AuthProvider'
-import { bookingApi, calculateQuote } from './api'
+import { bookingApi } from './api'
 import {
-  DEFAULT_ROOM_TYPES,
   bookingStatusLabels,
   bookingStatusTones,
   formatDate,
@@ -14,7 +14,7 @@ import {
   toCheckInIso,
   toCheckOutIso,
 } from './types'
-import type { BookingResponse, RoomType } from './types'
+import type { BookingResponse, PriceQuote, RoomType } from './types'
 import { errorMessage } from '../../shared/api/client'
 import { Alert, Badge, Button, Card, EmptyState, Field, PageHeader } from '../../shared/ui'
 import { Icon } from '../../shared/ui/Icon'
@@ -22,21 +22,14 @@ import { Icon } from '../../shared/ui/Icon'
 type Step = 'SEARCH' | 'HOLD' | 'CONFIRMED'
 type ActiveTab = 'BOOKING' | 'MY_BOOKINGS'
 
-export function BookingSteps() {
-  return (
-    <ol className="booking-steps" aria-label="Tiến trình đặt phòng">
-      {['Chọn phòng', 'Xem lại', 'Thanh toán', 'Xác nhận'].map((step, index) => (
-        <li key={step} aria-current={index === 0 ? 'step' : undefined}>
-          <span>{index + 1}</span>
-          {step}
-        </li>
-      ))}
-    </ol>
-  )
-}
-
 export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab } = {}) {
   const { user } = useAuth()
+  const location = useLocation()
+  const [searchParams] = useSearchParams()
+  const initialStay = readStay(searchParams)
+  const arrival = validDate(initialStay.arrival) ? initialStay.arrival : getTodayDateString()
+  const departure = validDate(initialStay.departure) && initialStay.departure > arrival
+    ? initialStay.departure : getTomorrowDateString(arrival)
 
   // Navigation Tabs: 'BOOKING' | 'MY_BOOKINGS'
   const [activeTab, setActiveTab] = useState<ActiveTab>(initialTab)
@@ -45,17 +38,17 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
   const [step, setStep] = useState<Step>('SEARCH')
 
   // Search & Filter State
-  const [checkInDate, setCheckInDate] = useState(() => getTodayDateString())
-  const [checkOutDate, setCheckOutDate] = useState(() => getTomorrowDateString(getTodayDateString()))
-  const [guestCount, setGuestCount] = useState<number>(2)
+  const [checkInDate, setCheckInDate] = useState(() => arrival)
+  const [checkOutDate, setCheckOutDate] = useState(() => departure)
+  const [guestCount, setGuestCount] = useState<number>(initialStay.adults + initialStay.children)
 
   // Room Catalog
-  const [roomTypes, setRoomTypes] = useState<RoomType[]>(DEFAULT_ROOM_TYPES)
-  const [selectedRoomId, setSelectedRoomId] = useState<number>(DEFAULT_ROOM_TYPES[0].id)
+  const [roomTypes, setRoomTypes] = useState<RoomType[]>([])
+  const [selectedRoomId, setSelectedRoomId] = useState<number>(0)
   const [loadingRooms, setLoadingRooms] = useState(false)
 
   // Member Tier Simulation
-  const [selectedTier, setSelectedTier] = useState<'STANDARD' | 'VIP' | 'DIAMOND'>('STANDARD')
+  const [quoteResponse, setQuoteResponse] = useState<(PriceQuote & { appliedTier: string; key: string }) | null>(null)
 
   // Active Booking & Async State
   const [currentBooking, setCurrentBooking] = useState<BookingResponse | null>(null)
@@ -69,25 +62,22 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
   // Countdown Timer State for Hold (15 minutes)
   const [remainingSeconds, setRemainingSeconds] = useState<number>(0)
 
-  // Load Room Types on Mount
+  // Search real availability; abort stale date/guest requests.
   useEffect(() => {
     const controller = new AbortController()
     setLoadingRooms(true)
-    bookingApi
-      .getRoomTypes(controller.signal)
-      .then((data) => {
-        if (!controller.signal.aborted && data.length > 0) {
+    setActionError(null)
+    bookingApi.search({ roomTypeId: 0, guestCount, startAt: toCheckInIso(checkInDate), endAt: toCheckOutIso(checkOutDate) }, controller.signal)
+      .then(data => {
+        if (!controller.signal.aborted) {
           setRoomTypes(data)
-          if (!data.some((r) => r.id === selectedRoomId)) {
-            setSelectedRoomId(data[0].id)
-          }
+          setSelectedRoomId(previous => data.some(room => room.id === previous) ? previous : data[0]?.id ?? 0)
         }
       })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoadingRooms(false)
-      })
+      .catch(error => { if (!controller.signal.aborted) { setRoomTypes([]); setActionError(errorMessage(error)) } })
+      .finally(() => { if (!controller.signal.aborted) setLoadingRooms(false) })
     return () => controller.abort()
-  }, [])
+  }, [checkInDate, checkOutDate, guestCount])
 
   // Load My Bookings when switching to tab or after state change
   const fetchMyBookings = () => {
@@ -96,7 +86,7 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
     bookingApi
       .getMyBookings()
       .then((list) => setMyBookings(list))
-      .catch(() => {})
+      .catch(error => setActionError(errorMessage(error)))
       .finally(() => setLoadingMyBookings(false))
   }
 
@@ -129,17 +119,30 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
     return () => clearInterval(interval)
   }, [step, currentBooking?.holdExpiresAt])
 
-  // Selected Room & Quote
-  const selectedRoom = useMemo(() => {
-    return roomTypes.find((r) => r.id === selectedRoomId) ?? roomTypes[0]
-  }, [roomTypes, selectedRoomId])
-
-  const quote = useMemo(() => {
-    return calculateQuote(selectedRoom, checkInDate, checkOutDate, guestCount, selectedTier)
-  }, [selectedRoom, checkInDate, checkOutDate, guestCount, selectedTier])
+  const selectedRoom = useMemo<RoomType>(() =>
+    roomTypes.find(room => room.id === selectedRoomId) ?? roomTypes[0] ??
+    { id: 0, code: '', name: 'Chưa có phòng phù hợp', maxOccupancy: 0, basePricePerNight: 0 },
+  [roomTypes, selectedRoomId])
+  const quoteKey = `${selectedRoom.id}|${checkInDate}|${checkOutDate}|${guestCount}|${user?.id ?? 'guest'}`
+  const quoteReady = quoteResponse?.key === quoteKey
+  const quote: PriceQuote = quoteReady ? quoteResponse : {
+    roomType: selectedRoom, guestCount, nights: 0, baseAmount: 0, discountRate: 0, discountAmount: 0, payableAmount: 0,
+  }
+  const selectedTier = quoteReady ? quoteResponse.appliedTier : 'STANDARD'
+  useEffect(() => {
+    const controller = new AbortController()
+    if (selectedRoom.id !== 0) {
+      bookingApi.quote(selectedRoom, { roomTypeId: selectedRoom.id, guestCount,
+        startAt: toCheckInIso(checkInDate), endAt: toCheckOutIso(checkOutDate) }, controller.signal)
+        .then(result => { if (!controller.signal.aborted) setQuoteResponse({ ...result, key: quoteKey }) })
+        .catch(error => { if (!controller.signal.aborted) setActionError(errorMessage(error)) })
+    }
+    return () => controller.abort()
+  }, [selectedRoom, checkInDate, checkOutDate, guestCount, quoteKey])
 
   // Date Change Handlers
   function handleCheckInChange(newCheckIn: string) {
+    if (!validDate(newCheckIn)) return
     setCheckInDate(newCheckIn)
     if (newCheckIn >= checkOutDate) {
       setCheckOutDate(getTomorrowDateString(newCheckIn))
@@ -154,7 +157,7 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
 
   // Action: Step 1 -> Step 2 (Create Hold)
   async function handleCreateHold() {
-    if (!user) return
+    if (!user?.roles.includes('CUSTOMER') || !quoteReady || !selectedRoom.id || loadingRooms) return
     setBusy(true)
     setActionError(null)
     try {
@@ -228,6 +231,12 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
 
   return (
     <div className="booking-container">
+      {currentBooking && ['CONFIRMED', 'COMPLETED'].includes(currentBooking.status) &&
+        <Button variant="secondary" onClick={() => bookingApi.downloadConfirmation(currentBooking.bookingCode).catch(error => setActionError(errorMessage(error)))}>
+          Tải PDF xác nhận
+        </Button>}
+      {!loadingRooms && roomTypes.length === 0 && <Alert>Không có phòng phù hợp trong khoảng đã chọn. Bạn có thể đổi ngày hoặc số khách.</Alert>}
+      {!quoteReady && selectedRoom.id !== 0 && <Alert tone="warning">Đang lấy báo giá từ máy chủ. Chưa thể giữ phòng.</Alert>}
       <PageHeader
         eyebrow="YOUR NEXT STAY"
         title="Kỳ nghỉ bắt đầu từ đây."
@@ -238,7 +247,6 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
           </Link>
         }
       />
-      <BookingSteps />
 
       {/* Main Tabs */}
       <div className="booking-tabs" role="tablist" aria-label="Phân loại chức năng đặt phòng">
@@ -289,7 +297,7 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
       {activeTab === 'BOOKING' && (
         <>
           {/* Stepper */}
-          <div className="booking-steps" aria-label="Các bước đặt phòng">
+          <div className="booking-steps" aria-label="Tiến trình đặt phòng">
             <span className={step === 'SEARCH' ? 'current' : 'completed'}>
               <b>{step === 'SEARCH' ? '1' : '✓'}</b>
               Chọn phòng & Báo giá
@@ -487,8 +495,8 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
                                 border:
                                   selectedTier === t ? '1px solid #358166' : '1px solid transparent',
                               }}
-                              onClick={() => setSelectedTier(t)}
-                              title={`Xem chiết khấu hạng ${t}`}
+                              disabled
+                              title={`Hạng do hệ thống xác định: ${t}`}
                             >
                               {t}
                             </button>
@@ -546,7 +554,7 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
                         <Button
                           variant="primary"
                           className="button--full"
-                          disabled={exceedsOccupancy || isInvalidDates}
+                          disabled={exceedsOccupancy || isInvalidDates || !quoteReady || loadingRooms || !user?.roles.includes('CUSTOMER')}
                           busy={busy}
                           onClick={handleCreateHold}
                         >
@@ -554,7 +562,7 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
                           Tiến hành giữ phòng (Hold 15p)
                         </Button>
                       ) : (
-                        <Link to="/login" className="button button--primary button--full">
+                        <Link to="/login" state={{ from: location.pathname + location.search }} className="button button--primary button--full">
                           <Icon name="user" size={17} />
                           Đăng nhập để đặt phòng
                         </Link>
@@ -822,7 +830,7 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
               title="Vui lòng đăng nhập"
               description="Đăng nhập tài khoản để xem toàn bộ lịch sử đơn đặt phòng và trạng thái thanh toán."
               action={
-                <Link to="/login" className="button button--primary">
+                <Link to="/login" state={{ from: location.pathname + location.search }} className="button button--primary">
                   Đăng nhập tài khoản
                 </Link>
               }

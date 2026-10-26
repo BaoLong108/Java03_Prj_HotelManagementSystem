@@ -91,63 +91,55 @@ test('calendar parser rejects malformed records and never forwards extra custome
   assert.throws(() => api.parseRoomCalendar({ ...fixture, to: date('16') }, range), /không hợp lệ/)
   assert.throws(() => api.parseRoomCalendar({ ...fixture, rooms: [{}] }, range), /không hợp lệ/)
 })
-const physical = (id) => ({ id, roomTypeId: 2, roomTypeName: 'Deluxe', roomNumber: String(id), floorNumber: 1, active: true })
-const block = (id, roomId, startAt = date('08','12:00'), endAt = date('09','10:00'), active = true) =>
-  ({ id, physicalRoomId: roomId, startAt, endAt, active, reason: 'Bảo trì thật', createdByUserId: 1 })
-function catalogFetch(blockResponse, rooms = [physical(21)], calls = []) {
-  return async (url, options) => {
-    calls.push(url)
-    assert.ok(options.headers.Authorization?.startsWith('Bearer '))
-    if (url === '/api/v1/admin/rooms/types') return Response.json([{ id: 2, name: 'Deluxe' }, { id: 3, name: 'Suite' }])
-    assert.ok(!url.includes('roomTypeId=3'), 'Filtered query must not load another room type')
-    if (url === '/api/v1/admin/rooms/physical?roomTypeId=2') return Response.json(rooms)
-    return blockResponse(Number(new URL(url, 'http://localhost').searchParams.get('roomId')), options)
-  }
-}
-test('real adapter joins dev types/rooms/blocks once per selected room, with session token and half-open filtering', async () => {
+
+test('real aggregate calendar uses one authenticated request and keeps room filters', async () => {
   const token = `header.${Buffer.from(JSON.stringify({ exp: Math.floor(Date.now()/1000) + 3600 })).toString('base64url')}.signature`
   Object.defineProperty(globalThis, 'sessionStorage', { configurable: true, value: { getItem: () => JSON.stringify({ accessToken: token, expiresAt: Date.now() + 3600000 }) } })
+  const query = { ...range, roomTypeId: 2 }
   const calls = []
-  globalThis.fetch = catalogFetch(roomId => Response.json([
-    block(1, roomId), block(2, roomId, date('07'), range.from), block(3, roomId, range.to, date('16')),
-    block(4, roomId, date('08'), date('09'), false),
-  ]), [physical(21)], calls)
-  const result = await api.getRoomCalendar({ ...range, roomTypeId: 2 })
-  assert.equal(result.rooms[0].roomTypeName, 'Deluxe')
-  assert.deepEqual(result.rooms[0].entries, [{ kind: 'BLOCK', id: 1, startAt: date('08','12:00'), endAt: date('09','10:00'), reason: 'Bảo trì thật' }])
-  assert.equal(result.roomTypes.length, 2)
-  assert.deepEqual(calls, ['/api/v1/admin/rooms/types', '/api/v1/admin/rooms/physical?roomTypeId=2', '/api/v1/admin/room-blocks?roomId=21&history=false'])
-})
-test('a failed block request keeps other rooms and marks the failed row as unknown', async () => {
-  globalThis.fetch = catalogFetch(roomId => roomId === 21 ? Response.json([block(1, roomId)]) : Response.json({ message: 'Unavailable' }, { status: 500 }), [physical(21), physical(22)])
-  const result = await api.getRoomCalendar({ ...range, roomTypeId: 2 })
-  assert.equal(result.rooms[0].entries.length, 1)
-  assert.equal(result.rooms[0].blockError, undefined)
-  assert.equal(result.rooms[1].entries.length, 0)
-  assert.match(result.rooms[1].blockError, /Chưa tải được/)
-})
-test('wrong-room, duplicate or malformed blocks are not rendered as valid data', async () => {
-  for (const blocks of [[block(1, 999)], [block(1, 21), block(1, 21)], [{ ...block(1,21), endAt: 'bad' }]]) {
-    globalThis.fetch = catalogFetch(() => Response.json(blocks))
-    const result = await api.getRoomCalendar({ ...range, roomTypeId: 2 })
-    assert.equal(result.rooms[0].entries.length, 0)
-    assert.ok(result.rooms[0].blockError)
+  globalThis.fetch = async (url, options) => {
+    calls.push(url)
+    assert.equal(options.headers.Authorization, `Bearer ${token}`)
+    return Response.json(api.roomCalendarFixture(query))
   }
+  const result = await api.getRoomCalendar(query)
+  assert.equal(result.rooms.length, 3)
+  assert.ok(result.rooms.every(room => room.roomTypeId === 2))
+  const request = new URL(calls[0], 'http://localhost')
+  assert.equal(request.pathname, '/api/v1/staff/room-calendar')
+  assert.equal(request.searchParams.get('from'), range.from)
+  assert.equal(request.searchParams.get('roomTypeId'), '2')
+  assert.equal(calls.length, 1)
 })
-test('permission failures and aborts propagate instead of becoming an empty calendar', async () => {
-  globalThis.fetch = catalogFetch(() => Response.json({ code: 'FORBIDDEN', message: 'Không đủ quyền' }, { status: 403 }))
-  await assert.rejects(api.getRoomCalendar({ ...range, roomTypeId: 2 }), error => error.status === 403)
-  const controller = new AbortController()
-  globalThis.fetch = catalogFetch(() => { controller.abort(); throw new Error('aborted') })
-  await assert.rejects(api.getRoomCalendar({ ...range, roomTypeId: 2 }, controller.signal), error => error.name === 'AbortError')
+test('aggregate calendar errors never become available rooms or fixtures', async () => {
+  globalThis.fetch = async () => Response.json({ message: 'Unavailable' }, { status: 500 })
+  await assert.rejects(api.getRoomCalendar(range), /Unavailable/)
 })
-test('unknown type makes no physical-room or block requests and catalog errors never use fixtures', async () => {
-  let calls = 0
-  globalThis.fetch = async () => { calls++; return Response.json([{ id: 2, name: 'Deluxe' }]) }
-  assert.equal((await api.getRoomCalendar({ ...range, roomTypeId: 999 })).rooms.length, 0)
-  assert.equal(calls, 1)
-  globalThis.fetch = async () => Response.json({ message: 'Catalog unavailable' }, { status: 500 })
-  await assert.rejects(api.getRoomCalendar(range), /Catalog unavailable/)
-  globalThis.fetch = async () => Response.json([{ id: 2, name: 'Deluxe' }, { id: 2, name: 'Duplicate' }])
-  await assert.rejects(api.getRoomCalendar(range), /không hợp lệ/)
+test('duplicate rooms or events and malformed server intervals are rejected', async () => {
+  const raw = api.roomCalendarFixture(range)
+  const duplicate = globalThis.structuredClone(raw); duplicate.rooms.push(duplicate.rooms[0])
+  assert.throws(() => api.parseRoomCalendar(duplicate, range), /không hợp lệ/)
+  const event = globalThis.structuredClone(raw); event.rooms[0].entries.push(event.rooms[0].entries[0])
+  assert.throws(() => api.parseRoomCalendar(event, range), /không hợp lệ/)
+  const malformed = globalThis.structuredClone(raw); malformed.rooms[0].entries[0].endAt = 'invalid'
+  assert.throws(() => api.parseRoomCalendar(malformed, range), /không hợp lệ/)
+})
+test('permission failures and aborts propagate without fallback', async () => {
+  const savedWindow = Object.getOwnPropertyDescriptor(globalThis, 'window')
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: { dispatchEvent: () => true } })
+  for (const status of [401, 403]) {
+    globalThis.fetch = async () => Response.json({ message: 'Denied' }, { status })
+    await assert.rejects(api.getRoomCalendar(range), error => error.status === status)
+  }
+  const controller = new AbortController(); controller.abort(new Error('aborted'))
+  globalThis.fetch = async (_, options) => { options.signal.throwIfAborted() }
+  await assert.rejects(api.getRoomCalendar(range, controller.signal), /aborted/)
+  if (savedWindow) Object.defineProperty(globalThis, 'window', savedWindow)
+  else delete globalThis.window
+})
+test('empty aggregate results are accepted and invalid query does not call server', async () => {
+  globalThis.fetch = async () => Response.json({ ...range, rooms: [], roomTypes: [] })
+  assert.deepEqual((await api.getRoomCalendar(range)).rooms, [])
+  globalThis.fetch = async () => { throw new Error('must not call') }
+  await assert.rejects(api.getRoomCalendar({ ...range, from: range.to }), error => error.status === 400)
 })

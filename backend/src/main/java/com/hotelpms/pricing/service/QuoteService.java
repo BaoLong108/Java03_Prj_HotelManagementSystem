@@ -106,7 +106,9 @@ public class QuoteService {
     }
 
     private long nightsBetween(QuoteRequest request) {
-        return ChronoUnit.DAYS.between(request.startAt().toLocalDate(), request.endAt().toLocalDate());
+        var zone = java.time.ZoneId.of("Asia/Ho_Chi_Minh");
+        return ChronoUnit.DAYS.between(request.startAt().atZoneSameInstant(zone).toLocalDate(),
+                request.endAt().atZoneSameInstant(zone).toLocalDate());
     }
 
     private LoyaltyTier resolveTier(Long customerId) {

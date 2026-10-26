@@ -18,10 +18,18 @@ public class RoomBlockService {
 
     private final RoomBlockRepository blocks;
     private final PhysicalRoomRepository rooms;
+    private final com.hotelpms.booking.service.RoomAllocationService allocator;
+    private final com.hotelpms.booking.repository.BookingRepository bookings;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
-    public RoomBlockService(RoomBlockRepository blocks, PhysicalRoomRepository rooms) {
+    public RoomBlockService(RoomBlockRepository blocks, PhysicalRoomRepository rooms,
+            com.hotelpms.booking.service.RoomAllocationService allocator,
+            com.hotelpms.booking.repository.BookingRepository bookings, org.springframework.jdbc.core.JdbcTemplate jdbc) {
         this.blocks = blocks;
         this.rooms = rooms;
+        this.allocator = allocator;
+        this.bookings = bookings;
+        this.jdbc = jdbc;
     }
 
     // ── Query ──────────────────────────────────────────────────────────────────
@@ -58,6 +66,9 @@ public class RoomBlockService {
                     "Thoi gian ket thuc phai sau thoi gian bat dau");
         }
 
+        allocator.lockPhysicalRoom(req.physicalRoomId());
+        if (bookings.hasActiveBookingOverlap(req.physicalRoomId(), req.startAt(), req.endAt(), Instant.now()))
+            throw new ApiException(HttpStatus.CONFLICT, "BOOKING_OVERLAP", "Phòng đã có booking hoặc hold còn hạn");
         PhysicalRoom room = rooms.findById(req.physicalRoomId())
                 .filter(PhysicalRoom::isActive)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND,
@@ -81,6 +92,9 @@ public class RoomBlockService {
 
     @Transactional
     public RoomBlockResponse releaseBlock(Long blockId, Long staffId) {
+        var ids = jdbc.queryForList("SELECT physical_room_id FROM room_blocks WHERE id=?", Long.class, blockId);
+        if (ids.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND, "BLOCK_NOT_FOUND", "Không tìm thấy block");
+        allocator.lockPhysicalRoom(ids.getFirst());
         RoomBlock block = blocks.findByIdWithRoom(blockId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND,
                         "BLOCK_NOT_FOUND", "Block khong ton tai"));
@@ -99,7 +113,7 @@ public class RoomBlockService {
 
     /**
      * Nem ApiException neu phong bi block trong khoang thoi gian.
-     * Chi goi 1 query duy nhat (findOverlapping) -- khong con race condition.
+     * Read-only check. Commands must also lock the physical room before checking overlaps.
      */
     @Transactional(readOnly = true)
     public void assertRoomNotBlocked(Long roomId, Instant from, Instant to) {

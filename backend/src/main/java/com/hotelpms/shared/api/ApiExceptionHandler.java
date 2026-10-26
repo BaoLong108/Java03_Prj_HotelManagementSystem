@@ -36,6 +36,12 @@ public class ApiExceptionHandler {
                 .body(new ApiError("VALIDATION_ERROR", "Dữ liệu không hợp lệ", details));
     }
 
+    @ExceptionHandler({org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,
+            org.springframework.web.bind.MissingServletRequestParameterException.class})
+    ResponseEntity<ApiError> invalidQuery() {
+        return ResponseEntity.badRequest().body(new ApiError("VALIDATION_ERROR", "Tham số truy vấn không hợp lệ"));
+    }
+
     @ExceptionHandler(HttpMessageNotReadableException.class)
     ResponseEntity<ApiError> malformedJson() {
         return ResponseEntity.badRequest().body(new ApiError("MALFORMED_JSON", "JSON không hợp lệ"));

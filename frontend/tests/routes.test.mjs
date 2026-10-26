@@ -36,10 +36,10 @@ test('guest has exact menu labels, login/register links and public home/search',
   const home = render('/')
   for (const label of ['Hotel PMS Mini', 'Trang chủ', 'Tìm phòng', 'Đăng nhập', 'Đăng ký']) assert.ok(home.includes(label))
   const booking = render('/booking')
-  assert.ok(booking.includes('Kỳ nghỉ bắt đầu từ đây.'))
+  assert.ok(booking.includes('Đặt phòng'))
   assert.ok(booking.includes('aria-label="Tiến trình đặt phòng"') && booking.includes('href="/rooms"'))
   const rooms = render('/rooms')
-  assert.ok(rooms.includes('Một không gian dành cho bạn.') && rooms.includes('Danh mục loại phòng'))
+  assert.ok(rooms.includes('Đặt phòng') && rooms.includes('Ngày nhận phòng'))
   assert.ok(!home.includes('href="/staff"'))
 })
 test('authenticated header shows name/logout and hides login/register menu', () => {
@@ -47,11 +47,11 @@ test('authenticated header shows name/logout and hides login/register menu', () 
   assert.ok(html.includes('Test User') && html.includes('Đăng xuất'))
   assert.ok(!html.includes('href="/login"') && !html.includes('href="/register"'))
 })
-test('staff and multi-role users see dedicated menu and honest placeholders', () => {
+test('staff and multi-role users see authorized calendar loading and lookup controls', () => {
   for (const roles of [['STAFF'], ['ADMIN'], ['CUSTOMER', 'STAFF'], ['CUSTOMER', 'ADMIN']]) {
     const pages = [
-      ['/staff/calendar', 'Lịch phòng', roles.includes('ADMIN') ? 'Đang tải lịch phòng' : 'Chưa tải được danh sách phòng cho STAFF'],
-      ['/staff/bookings', 'Tra cứu booking', 'Nhập mã booking để bắt đầu.'],
+      ['/staff/calendar', 'Lịch phòng', 'Đang tải lịch phòng'],
+      ['/staff/bookings', 'Tra cứu booking', 'Nhập mã booking hoặc số điện thoại để bắt đầu.'],
     ]
     for (const [path, heading, unavailable] of pages) {
       const html = render(path, roles)
@@ -64,7 +64,7 @@ test('staff and multi-role users see dedicated menu and honest placeholders', ()
 test('anonymous/CUSTOMER cannot render staff content; cached roles do not bypass loading', () => {
   for (const roles of [null, ['CUSTOMER']]) {
     assert.ok(!render('/staff/calendar', roles).includes('Điều hướng nhân viên'))
-    assert.ok(!render('/staff/bookings', roles).includes('Nhập mã booking để bắt đầu.'))
+    assert.ok(!render('/staff/bookings', roles).includes('Nhập mã booking hoặc số điện thoại để bắt đầu.'))
     assert.ok(!render('/staff/calendar', roles).includes('Lịch phòng chưa có dữ liệu xác thực'))
   }
   assert.ok(!render('/staff/calendar', ['ADMIN'], 'loading').includes('Điều hướng nhân viên'))

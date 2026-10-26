@@ -1,3 +1,4 @@
+import { bookingApi } from '../../booking/api'
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
@@ -52,18 +53,18 @@ export function BookingSearchPage() {
     {USE_FIXTURES && <p className="fixture-help">Dữ liệu mẫu: mã BK-MAU-001, BK-MAU-003 hoặc số điện thoại 0900000123.</p>}
     <Card><form className="booking-search-form" onSubmit={submit} noValidate autoComplete="off">
       <label className="staff-control">Tìm theo<select aria-label="Tìm theo" value={mode} onChange={event => { clear(); setMode(event.target.value as SearchMode); setInput('') }}>
-        <option value="bookingCode">Mã booking</option><option value="phone" disabled={!USE_FIXTURES}>Số điện thoại</option>
+        <option value="bookingCode">Mã booking</option><option value="phone">Số điện thoại</option>
       </select></label>
       <Field label={mode === 'bookingCode' ? 'Mã booking' : 'Số điện thoại'} type={mode === 'phone' ? 'tel' : 'text'}
         inputMode={mode === 'phone' ? 'tel' : 'text'} value={input} maxLength={mode === 'phone' ? 24 : 64} required
         autoComplete="off" autoCapitalize="none" spellCheck={false} error={validation}
         onChange={event => { clear(); setInput(event.target.value) }} hint="Nhập một giá trị cụ thể. Không liệt kê toàn bộ booking." />
       <Button type="submit" busy={busy}>Tra cứu</Button>
-    </form>{!USE_FIXTURES && <p className="booking-search-note">Chờ API tìm theo SĐT (Thanh Binh)</p>}</Card>
+    </form></Card>
     <p className="booking-search-note">Thời gian theo giờ Việt Nam (UTC+07:00). Thông tin liên hệ chỉ hiển thị dạng đã che.</p>
     {busy && <LoadingState message="Đang tra cứu booking…" />}
     {error && <Alert>{error}</Alert>}
-    {!busy && !error && !result && <p className="booking-search-note">{USE_FIXTURES ? 'Nhập mã booking hoặc số điện thoại để bắt đầu.' : 'Nhập mã booking để bắt đầu.'}</p>}
+    {!busy && !error && !result && <p className="booking-search-note">{USE_FIXTURES ? 'Nhập mã booking hoặc số điện thoại để bắt đầu.' : 'Nhập mã booking hoặc số điện thoại để bắt đầu.'}</p>}
     {result && !result.items.length && <Card><EmptyState icon="calendar" title="Không tìm thấy booking" description="Kiểm tra lại mã booking hoặc số điện thoại và thử lại." /></Card>}
     {result && result.items.length > 0 && <>
       <p className="booking-result-count" role="status">Tìm thấy {result.items.length} booking.</p>
@@ -81,6 +82,8 @@ export function BookingSearchPage() {
           {item.customer ? <><div><dt>Số điện thoại (đã che)</dt><dd>{item.customer.phoneMasked}</dd></div>
             <div><dt>Email (đã che)</dt><dd>{item.customer.emailMasked}</dd></div></> : <div><dt>Thông tin liên hệ</dt><dd>—</dd></div>}
         </dl>
+        {['CONFIRMED', 'COMPLETED'].includes(item.status) &&
+          <Button variant="secondary" onClick={() => bookingApi.downloadConfirmation(item.bookingCode).catch(error => setError(errorMessage(error)))}>Tải PDF xác nhận</Button>}
         <Link className="text-link" to={bookingCalendarLink(item)}>Xem tuần lịch của booking {item.bookingCode} →</Link>
       </article>)}</div>
     </>}

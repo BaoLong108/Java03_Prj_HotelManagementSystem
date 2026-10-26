@@ -64,33 +64,6 @@ export const bookingStatusTones: Record<BookingStatus, 'neutral' | 'success' | '
   EXPIRED: 'danger',
 }
 
-export const DEFAULT_ROOM_TYPES: RoomType[] = [
-  {
-    id: 1,
-    code: 'STANDARD_CITY',
-    name: 'Standard City View',
-    description: 'Phòng tiêu chuẩn hướng thành phố, không gian ấm cúng tiện nghi đầy đủ cho 2 khách.',
-    maxOccupancy: 2,
-    basePricePerNight: 900000,
-  },
-  {
-    id: 2,
-    code: 'DELUXE_OCEAN',
-    name: 'Deluxe Ocean View',
-    description: 'Phòng cao cấp ban công ngắm toàn cảnh biển, trang bị giường King sang trọng.',
-    maxOccupancy: 2,
-    basePricePerNight: 1500000,
-  },
-  {
-    id: 3,
-    code: 'SUITE_PRESIDENT',
-    name: 'Presidential Suite',
-    description: 'Căn hộ Suite thượng hạng phòng khách riêng biệt, bồn tắm jacuzzi và dịch vụ quản gia.',
-    maxOccupancy: 4,
-    basePricePerNight: 3500000,
-  },
-]
-
 export function formatVnd(amount: number): string {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount)
 }

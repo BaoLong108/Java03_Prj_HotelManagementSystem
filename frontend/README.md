@@ -26,13 +26,13 @@ Profile backend `dev` có `customer@hotel-pms.test`, `staff@hotel-pms.test`, `ad
 | `/` | Hero ảnh concept, chọn ngày/số khách, giới thiệu và chính sách thành viên |
 | `/login`, `/register` | Gọi API Auth thật; lỗi chung + lỗi từng field; đang gửi; ẩn/hiện mật khẩu |
 | `/account` | Cần đăng nhập; dữ liệu từ login/register hoặc `/auth/me` khi tải lại |
-| `/rooms` | Form ngày/số khách có validation, URL chia sẻ được; chờ API danh mục/availability của Sang |
+| `/rooms` | Tìm phòng/quote từ API thật, chọn ngày/số khách, URL chia sẻ được, đăng nhập quay lại lịch đã chọn |
 | `/rooms/:roomTypeId` | Trạng thái chưa sẵn sàng; chờ API chi tiết, ảnh và tiện nghi |
-| `/booking` | Tiến trình 4 bước, lịch nghỉ/summary; chờ quote/hold/payment, chưa tạo booking |
-| `/my-bookings` | CUSTOMER; lịch sử chưa có API, không suy ra danh sách trống |
+| `/booking` | Quote → hold 15 phút → thanh toán demo, snapshot server, tải PDF xác nhận |
+| `/my-bookings` | CUSTOMER; danh sách booking thật, tiếp tục thanh toán hold còn hạn, hủy booking chưa trả tiền |
 | `/staff` | Dashboard, health thật, điều hướng công cụ; KPI/chart chờ Analytics API; STAFF hoặc ADMIN |
-| `/staff/bookings` | Khung bảng đặt phòng; chờ API để bật tra cứu/filter/actions |
-| `/staff/calendar` | Xem/chuyển tuần thực; lịch phòng/booking/block chưa có API |
+| `/staff/bookings` | Tra mã booking/SĐT đầy đủ qua API STAFF/ADMIN, contact đã che, tải PDF |
+| `/staff/calendar` | Lịch phòng vật lý 7 ngày, booking + block thật, lọc loại phòng và chi tiết |
 | `/staff/rooms` | Trạng thái chưa sẵn sàng; không suy ra phòng trống/dọn sạch |
 | `/admin` | Điều hướng các khu vực quản trị; cần ADMIN |
 | `/admin/rooms` | Chuyển tab loại phòng/phòng vật lý/giá; chờ CRUD API |
@@ -41,7 +41,7 @@ Profile backend `dev` có `customer@hotel-pms.test`, `staff@hotel-pms.test`, `ad
 | `/ui-kit` | Tham chiếu component cho lập trình viên, không nằm trong menu sản phẩm |
 | Route khác | Trang 404 |
 
-Không có phòng, booking, doanh thu, điểm hoặc availability giả. Không gọi API nghiệp vụ chưa tồn tại. Không có luồng staff check-in/check-out. Guards ở frontend chỉ kiểm soát giao diện; backend phải bổ sung RBAC nghiệp vụ ở M1-05 trước khi mở các endpoint tương ứng.
+Mặc định gọi API thật. `VITE_USE_FIXTURES=true` chỉ bật dữ liệu mẫu Staff có banner, không dùng để nghiệm thu nghiệp vụ. Không có luồng staff check-in/check-out. Guards ở frontend kiểm soát giao diện; backend đã kiểm tra JWT/RBAC và ownership. Contract hiện tại nằm trong [Sprint 2 completion](../docs/sprint2-completion.md).
 
 ## Cấu trúc và người tiếp tục
 

@@ -7,10 +7,8 @@ import com.hotelpms.booking.dto.CreateBookingRequest;
 import com.hotelpms.booking.entity.Booking;
 import com.hotelpms.booking.entity.BookingStatus;
 import com.hotelpms.booking.repository.BookingRepository;
-import com.hotelpms.loyalty.LoyaltyTier;
 import com.hotelpms.shared.api.ApiException;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -31,15 +29,23 @@ public class BookingService {
     private final BookingRepository bookingRepository;
     private final CustomerProfileRepository customerProfileRepository;
     private final RoomAllocationService roomAllocationService;
+    private final BookingLifecycleTransitions lifecycle;
+    private final com.hotelpms.pricing.service.QuoteService quotes;
+    private final com.hotelpms.payment.repository.PaymentAttemptRepository payments;
 
     public BookingService(
             BookingRepository bookingRepository,
             CustomerProfileRepository customerProfileRepository,
-            RoomAllocationService roomAllocationService
+            RoomAllocationService roomAllocationService,
+            com.hotelpms.pricing.service.QuoteService quotes,
+            com.hotelpms.payment.repository.PaymentAttemptRepository payments, BookingLifecycleTransitions lifecycle
     ) {
         this.bookingRepository = bookingRepository;
         this.customerProfileRepository = customerProfileRepository;
         this.roomAllocationService = roomAllocationService;
+        this.quotes = quotes;
+        this.payments = payments;
+        this.lifecycle = lifecycle;
     }
 
     @Transactional
@@ -77,13 +83,13 @@ public class BookingService {
         }
 
         // 4. Calculate pricing snapshot
-        BigDecimal baseAmount = roomType.basePricePerNight()
-                .multiply(BigDecimal.valueOf(nights))
-                .setScale(2, RoundingMode.HALF_UP);
-
-        BigDecimal discountRate = getDiscountRateForTier(profile.getTierCode());
-        BigDecimal discountAmount = baseAmount.multiply(discountRate).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal payableAmount = baseAmount.subtract(discountAmount);
+        var snapshot = quotes.quote(new com.hotelpms.pricing.dto.QuoteRequest(request.roomTypeId(),
+                request.startAt().atOffset(java.time.ZoneOffset.UTC), request.endAt().atOffset(java.time.ZoneOffset.UTC),
+                request.guestCount()), customerId).toSnapshot();
+        BigDecimal baseAmount = snapshot.baseAmount();
+        BigDecimal discountRate = snapshot.discountRate();
+        BigDecimal discountAmount = snapshot.discountAmount();
+        BigDecimal payableAmount = snapshot.payableAmount();
 
         // 5. Concurrency control: Find and lock an available physical room
         Instant now = Instant.now();
@@ -100,7 +106,7 @@ public class BookingService {
 
         // 6. Generate booking code and 15-minute hold expiration
         String bookingCode = generateBookingCode();
-        Instant holdExpiresAt = now.plus(15, ChronoUnit.MINUTES);
+        Instant holdExpiresAt = Instant.now().plus(15, ChronoUnit.MINUTES);
 
         // 7. Persist booking
         Booking booking = new Booking(
@@ -163,6 +169,8 @@ public class BookingService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_BOOKING_STATUS", "Đơn đặt phòng đã hoàn tất kỳ nghỉ, không thể hủy");
         }
 
+        if (booking.getStatus() != BookingStatus.PENDING_PAYMENT)
+            throw new ApiException(HttpStatus.CONFLICT, "INVALID_BOOKING_STATUS", "Chỉ hủy booking chưa thanh toán");
         booking.cancel(Instant.now());
         Booking saved = bookingRepository.save(booking);
         return BookingResponse.from(saved);
@@ -190,6 +198,7 @@ public class BookingService {
             throw new ApiException(HttpStatus.CONFLICT, "BOOKING_EXPIRED", "Thời hạn giữ phòng 15 phút đã hết hạn");
         }
 
+        requirePaid(booking.getId());
         booking.confirm(now);
         Booking saved = bookingRepository.save(booking);
         return BookingResponse.from(saved);
@@ -212,12 +221,14 @@ public class BookingService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_BOOKING_STATUS", "Chỉ đơn đặt phòng đã xác nhận (CONFIRMED) mới có thể hoàn tất");
         }
 
+        requirePaid(booking.getId());
+        if (booking.getEndAt().isAfter(Instant.now()))
+            throw new ApiException(HttpStatus.CONFLICT, "STAY_NOT_FINISHED", "Chưa kết thúc kỳ nghỉ");
         booking.complete(Instant.now());
         Booking saved = bookingRepository.save(booking);
         return BookingResponse.from(saved);
     }
 
-    @Transactional
     public int sweepExpiredHolds(Instant now) {
         List<Booking> expiredCandidates = bookingRepository.findByStatusAndHoldExpiresAtBefore(
                 BookingStatus.PENDING_PAYMENT,
@@ -233,20 +244,10 @@ public class BookingService {
         return count;
     }
 
-    @Transactional
     public boolean expireHoldIfPending(Long bookingId, Instant now) {
-        var opt = bookingRepository.findByIdForUpdate(bookingId);
-        if (opt.isEmpty()) return false;
-        Booking booking = opt.get();
-        if (booking.getStatus() == BookingStatus.PENDING_PAYMENT && !booking.getHoldExpiresAt().isAfter(now)) {
-            booking.expire(now);
-            bookingRepository.save(booking);
-            return true;
-        }
-        return false;
+        return lifecycle.expire(bookingId, now);
     }
 
-    @Transactional
     public int autoCompleteDepartedBookings(Instant now) {
         List<Booking> departedCandidates = bookingRepository.findByStatusAndEndAtLessThanEqual(
                 BookingStatus.CONFIRMED,
@@ -262,26 +263,13 @@ public class BookingService {
         return count;
     }
 
-    @Transactional
     public boolean completeBookingIfConfirmed(Long bookingId, Instant now) {
-        var opt = bookingRepository.findByIdForUpdate(bookingId);
-        if (opt.isEmpty()) return false;
-        Booking booking = opt.get();
-        if (booking.getStatus() == BookingStatus.CONFIRMED && !booking.getEndAt().isAfter(now)) {
-            booking.complete(now);
-            bookingRepository.save(booking);
-            return true;
-        }
-        return false;
+        return lifecycle.complete(bookingId, now);
     }
 
-    private BigDecimal getDiscountRateForTier(LoyaltyTier tier) {
-        if (tier == null) return BigDecimal.ZERO;
-        return switch (tier) {
-            case VIP -> new BigDecimal("0.1000");
-            case DIAMOND -> new BigDecimal("0.1500");
-            case STANDARD -> BigDecimal.ZERO;
-        };
+    private void requirePaid(Long bookingId) {
+        if (!payments.existsByBookingIdAndStatus(bookingId, com.hotelpms.payment.entity.PaymentStatus.SUCCEEDED))
+            throw new ApiException(HttpStatus.CONFLICT, "PAYMENT_REQUIRED", "Booking chưa có thanh toán thành công");
     }
 
     private String generateBookingCode() {

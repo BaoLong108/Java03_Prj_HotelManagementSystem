@@ -83,17 +83,6 @@ export async function searchBookings(query: BookingQuery, signal?: AbortSignal):
     signal?.throwIfAborted()
     return parseBookingSearch(bookingSearchFixture(normalized))
   }
-  if (normalized.bookingCode !== undefined) {
-    try {
-      const raw = await apiRequest<unknown>(`/api/v1/bookings/${encodeURIComponent(normalized.bookingCode)}`, { signal })
-      const item = parseBookingDetail(raw)
-      if (item.bookingCode !== normalized.bookingCode) return invalid()
-      return { items: [item] }
-    } catch (error) {
-      // A missing route/other 404 is an integration error, never an empty search result.
-      if (error instanceof ApiError && error.status === 404 && error.code === 'BOOKING_NOT_FOUND') return { items: [] }
-      throw error
-    }
-  }
-  throw new ApiError(501, 'Chờ API tìm theo SĐT (Thanh Binh)', 'PHONE_SEARCH_UNAVAILABLE')
+  const params = new URLSearchParams(normalized.bookingCode !== undefined ? { bookingCode: normalized.bookingCode } : { phone: normalized.phone! })
+  return parseBookingSearch(await apiRequest<unknown>(`/api/v1/staff/bookings/search?${params}`, { signal }))
 }

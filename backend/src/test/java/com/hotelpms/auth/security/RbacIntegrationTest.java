@@ -364,9 +364,10 @@ class RbacIntegrationTest {
         assertThat(bookings.findById(booking.getId()).orElseThrow().getStatus())
                 .isEqualTo(BookingStatus.PENDING_PAYMENT);
         mvc.perform(get(path).header("Authorization", "Bearer " + staff.token())).andExpect(status().isOk());
-        // Verifies the current endpoint's ownership, not the future payment acceptance criteria.
+        // Owner authorization succeeds, but unpaid confirmation must still be rejected.
         mvc.perform(post(path + "/confirm").header("Authorization", "Bearer " + customer.token()))
-                .andExpect(status().isOk());
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PAYMENT_REQUIRED"));
     }
 
     @Test
