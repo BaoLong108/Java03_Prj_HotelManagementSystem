@@ -9,7 +9,7 @@ import type { IconName } from '../ui/Icon'
 const titles: Record<string, string> = {
   '/': 'Một khoảng nghỉ, thật riêng', '/rooms': 'Phòng & không gian', '/booking': 'Đặt phòng', '/login': 'Đăng nhập',
   '/register': 'Tạo tài khoản', '/account': 'Tài khoản', '/my-bookings': 'Kỳ nghỉ của tôi',
-  '/staff': 'Tổng quan vận hành', '/staff/bookings': 'Quản lý đặt phòng', '/staff/calendar': 'Lịch phòng',
+  '/staff': 'Tổng quan vận hành', '/staff/bookings': 'Tra cứu booking', '/staff/calendar': 'Lịch phòng',
   '/staff/rooms': 'Tình trạng phòng', '/admin': 'Quản trị khách sạn', '/admin/rooms': 'Danh mục phòng',
   '/admin/members': 'Thành viên & chính sách', '/admin/settings': 'Cài đặt', '/ui-kit': 'Thư viện giao diện', '/403': 'Không đủ quyền',
 }

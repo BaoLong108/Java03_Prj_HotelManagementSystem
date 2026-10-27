@@ -1,6 +1,6 @@
 # Hotel PMS Mini
 
-> Bản sửa ổn định Sprint 1 đã qua backend verify cùng frontend lint/test/build. Nghiệp vụ còn WIP được ghi trong [hướng dẫn đồng bộ và chạy Sprint 2](docs/sprint1-stabilization.md). PR từ `fix/sprint1-integration-stabilization` cần được review và merge vào `dev` trước khi cả nhóm pull baseline mới.
+> Bản tích hợp Sprint 2 ngày 26/10 đã chạy Booking hold, Payment demo, RoomBlock/availability, Staff Calendar/Lookup và PDF với API/DB thật. Xem [task, contract và kết quả kiểm thử](docs/sprint2-completion.md) trước khi phát triển Sprint 3.
 
 Monorepo cho đồ án quản lý một khách sạn. Nguyễn Ngọc Bảo Long phụ trách kỹ thuật và tích hợp. Kế hoạch chia 4 sprint, 5 thành viên; ưu tiên hoàn thành các việc P0 trước.
 
@@ -24,7 +24,7 @@ docs/                    Quy ước kiến trúc, API, cộng tác
 compose.yaml             PostgreSQL cho local
 ```
 
-Backend đã có entity tài khoản, đăng ký/đăng nhập JWT và `/api/v1/auth/me`. Frontend có hai cổng responsive cho khách và Staff/Admin, trang chủ với ảnh concept, chọn lịch/số khách, tài khoản, chính sách thành viên, lịch theo tuần và bộ component chung. Auth nối API thật, JWT và menu theo vai trò. Xem [hướng dẫn frontend](frontend/README.md), [nhật ký redesign](docs/frontend-redesign.md) và [hợp đồng API Auth](docs/auth.md). Dữ liệu phòng/booking/loyalty/báo cáo cùng các thao tác ghi nghiệp vụ còn chờ API tương ứng.
+Backend đã có entity tài khoản, đăng ký/đăng nhập JWT và `/api/v1/auth/me`. Frontend có hai cổng responsive cho khách và Staff/Admin, trang chủ với ảnh concept, tìm phòng/quote thật, hold 15 phút, thanh toán demo, lịch sử booking, PDF và lịch/tra cứu Staff. Auth nối API thật, JWT và menu theo vai trò. Xem [hướng dẫn frontend](frontend/README.md), [nhật ký redesign](docs/frontend-redesign.md) và [hợp đồng API Auth](docs/auth.md). Cộng điểm/nâng hạng, VNPay và báo cáo theo các sprint tiếp theo.
 
 ## Chạy local
 

@@ -226,6 +226,71 @@ class BookingRepositoryTest {
     }
 
     @Test
+    void testFindByStatusAndEndAtLessThanEqual() {
+        Instant now = Instant.now();
+
+        // Confirmed booking with endAt in the past (already departed)
+        Booking pastConfirmed = new Booking(
+                "BK-PAST-01",
+                customerId,
+                roomTypeId,
+                physicalRoomId101,
+                (short) 1,
+                now.minus(3, ChronoUnit.DAYS),
+                now.minus(1, ChronoUnit.DAYS),
+                now.minus(3, ChronoUnit.DAYS).plus(15, ChronoUnit.MINUTES),
+                new BigDecimal("1000000.00"),
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                new BigDecimal("1000000.00")
+        );
+        pastConfirmed.confirm(now.minus(3, ChronoUnit.DAYS));
+
+        // Confirmed booking with endAt in the future (still active)
+        Booking futureConfirmed = new Booking(
+                "BK-FUT-01",
+                customerId,
+                roomTypeId,
+                physicalRoomId102,
+                (short) 1,
+                now.plus(1, ChronoUnit.DAYS),
+                now.plus(3, ChronoUnit.DAYS),
+                now.plus(15, ChronoUnit.MINUTES),
+                new BigDecimal("2000000.00"),
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                new BigDecimal("2000000.00")
+        );
+        futureConfirmed.confirm(now);
+
+        // Pending payment booking with endAt in the past (should NOT match because not CONFIRMED)
+        Booking pastPending = new Booking(
+                "BK-PEND-PAST-01",
+                customerId,
+                roomTypeId,
+                physicalRoomId101,
+                (short) 1,
+                now.minus(6, ChronoUnit.DAYS),
+                now.minus(4, ChronoUnit.DAYS),
+                now.minus(6, ChronoUnit.DAYS).plus(15, ChronoUnit.MINUTES),
+                new BigDecimal("1000000.00"),
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                new BigDecimal("1000000.00")
+        );
+
+        bookingRepository.saveAll(List.of(pastConfirmed, futureConfirmed, pastPending));
+
+        List<Booking> departedConfirmed = bookingRepository.findByStatusAndEndAtLessThanEqual(
+                BookingStatus.CONFIRMED,
+                now
+        );
+
+        assertThat(departedConfirmed).hasSize(1);
+        assertThat(departedConfirmed.getFirst().getBookingCode()).isEqualTo("BK-PAST-01");
+    }
+
+    @Test
     void testActiveBookingOverlapDetection() {
         Instant now = Instant.now();
         Instant day1Start = now.plus(1, ChronoUnit.DAYS);

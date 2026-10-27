@@ -17,7 +17,7 @@ export class ApiError extends Error {
 }
 
 type ApiErrorBody = { code?: string; message?: string; details?: Record<string, string> }
-type RequestOptions = { method?: string; body?: unknown; token?: string; auth?: boolean; signal?: AbortSignal }
+type RequestOptions = { method?: string; body?: unknown; token?: string; auth?: boolean; signal?: AbortSignal; responseType?: 'json' | 'blob' }
 const statusMessages: Record<number, string> = {
   400: 'Thông tin chưa hợp lệ. Vui lòng kiểm tra lại.',
   401: 'Vui lòng đăng nhập lại để tiếp tục.',
@@ -71,6 +71,7 @@ export async function apiRequest<T>(
   }
 
   if (response.status === 204) return undefined as T
+  if (options.responseType === 'blob') return await response.blob() as T
   return response.json() as Promise<T>
 }
 

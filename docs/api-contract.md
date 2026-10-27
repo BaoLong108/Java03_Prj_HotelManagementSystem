@@ -2,6 +2,8 @@
 
 Đây là quy ước ban đầu để các module có cùng cách giao tiếp. Endpoint nghiệp vụ cụ thể được chốt trong PR của từng task trước khi frontend tích hợp.
 
+Contract Booking, Payment demo, Room availability, PDF và Staff Calendar/Lookup đã triển khai ngày 26/10/2026: [Sprint 2 completion](sprint2-completion.md#contract-đang-chạy). Đây là nguồn hiện tại cho DTO, kiểu tiền và các role; các tài liệu bàn giao cũ giữ lại lịch sử chuẩn bị.
+
 - Prefix: `/api/v1`. JSON dùng `camelCase`; ID dùng `Long` ở Java và JSON number, khớp `BIGINT` trong schema V1.
 - Thời gian gửi/nhận theo ISO 8601 có offset, ví dụ `2026-10-08T12:00:00+07:00`. Khoảng thời gian luôn gồm `startAt`, `endAt` và `startAt < endAt`.
 - Tiền là số thập phân theo VND, không dùng `double` ở backend. Response quote/booking dùng tên trường thống nhất: `baseAmount`, `discountRate`, `payableAmount`.

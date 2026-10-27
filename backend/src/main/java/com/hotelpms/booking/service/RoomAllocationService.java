@@ -28,6 +28,13 @@ public class RoomAllocationService {
         this.bookingRepository = bookingRepository;
     }
 
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void lockPhysicalRoom(Long roomId) {
+        var locked = jdbcTemplate.queryForList("SELECT id FROM physical_rooms WHERE id=? FOR UPDATE", Long.class, roomId);
+        if (locked.isEmpty()) throw new com.hotelpms.shared.api.ApiException(org.springframework.http.HttpStatus.NOT_FOUND,
+                "PHYSICAL_ROOM_NOT_FOUND", "Không tìm thấy phòng");
+    }
+
     public Optional<RoomTypeInfo> getRoomTypeInfo(Long roomTypeId) {
         String sql = """
             SELECT id, name, max_occupancy, base_price_per_night, is_active
@@ -59,8 +66,11 @@ public class RoomAllocationService {
 
         for (Long roomId : candidateIds) {
             // Lock the candidate row for the duration of the current transaction
-            String lockSql = "SELECT id FROM physical_rooms WHERE id = ? FOR UPDATE";
-            jdbcTemplate.queryForObject(lockSql, Long.class, roomId);
+            lockPhysicalRoom(roomId);
+            now = Instant.now();
+            // Reclaim expired holds only while allocating a new booking, never while releasing a block.
+            jdbcTemplate.update("UPDATE bookings SET status='EXPIRED',expired_at=?,updated_at=? WHERE physical_room_id=? AND status='PENDING_PAYMENT' AND hold_expires_at<=?",
+                    java.sql.Timestamp.from(now), java.sql.Timestamp.from(now), roomId, java.sql.Timestamp.from(now));
 
             // 1. Check active booking overlaps
             boolean bookingOverlap = bookingRepository.hasActiveBookingOverlap(roomId, startAt, endAt, now);

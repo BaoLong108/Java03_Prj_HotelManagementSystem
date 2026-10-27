@@ -17,9 +17,19 @@ import org.springframework.web.bind.annotation.RestController;
 public class RoomController {
 
     private final RoomService rooms;
+    private final com.hotelpms.room.service.RoomAvailabilityService availability;
 
-    public RoomController(RoomService rooms) {
+    public RoomController(RoomService rooms, com.hotelpms.room.service.RoomAvailabilityService availability) {
         this.rooms = rooms;
+        this.availability = availability;
+    }
+
+    @GetMapping("/availability")
+    public java.util.List<com.hotelpms.room.service.RoomAvailabilityService.AvailableRoomType> availability(
+            @org.springframework.web.bind.annotation.RequestParam java.time.Instant startAt,
+            @org.springframework.web.bind.annotation.RequestParam java.time.Instant endAt,
+            @org.springframework.web.bind.annotation.RequestParam int guestCount) {
+        return availability.search(startAt, endAt, guestCount);
     }
 
     /** GET /api/v1/rooms — danh sách loại phòng đang hoạt động */

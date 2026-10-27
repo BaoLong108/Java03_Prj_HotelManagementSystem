@@ -6,3 +6,6 @@
 *.log
 # Unused binary from the starter template
 frontend/src/assets/hero.png
+
+# Personal development logs
+docs/booking-dev-log.md

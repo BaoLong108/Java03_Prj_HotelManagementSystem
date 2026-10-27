@@ -1,5 +1,7 @@
 # Pricing API – `GET /api/v1/pricing/quote`
 
+> Cập nhật 26/10/2026: Room/Loyalty adapter và public quote đã tích hợp thật. Contract đang chạy dùng JSON number cho BigDecimal của Quote/Booking, giữ serializer hiện có; ví dụ chuỗi số và các dependency còn chờ bên dưới là bản đề xuất lịch sử. Số đêm tính sau khi đổi cả hai mốc về `Asia/Ho_Chi_Minh`. Xem [contract Sprint 2 hiện tại](../sprint2-completion.md).
+
 > Tài liệu đề xuất, dành riêng cho module **pricing**. File [`docs/api-contract.md`](../../api-contract.md)
 > là quy ước chung; tài liệu này **không sửa** file chung mà chỉ bổ sung chi tiết cho một endpoint.
 > Khi nhóm thống nhất, nội dung sẽ được đưa vào `docs/api-contract.md`.

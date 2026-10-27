@@ -1,5 +1,7 @@
 # Sprint 2 — Contract Security, Loyalty và tích hợp
 
+> Cập nhật 26/10/2026: phần còn lại bên dưới lưu quyết định chuẩn bị ngày 19/10. Contract đã triển khai và kết quả nghiệm thu hiện tại nằm trong [bản hoàn tất Sprint 2](sprint2-completion.md). Payment gate, Room/Quote adapters và Staff API đã có implementation thật trong bản tích hợp mới.
+
 Ngày: 19/10/2026. Owner: Nguyễn Ngọc Bảo Long. Nhánh thực hiện: BaoLong, đồng bộ từ origin/dev `cd8bb39`.
 
 Tài liệu phân biệt rõ contract đang có code và đề xuất còn chờ chủ module. Không tạo endpoint, Payment DTO hoặc Pricing Engine giả. [Audit Sprint 1](sprint1-audit-2026-10-19.md) và [checklist cuối sprint](sprint2-acceptance-checklist.md) là hai tài liệu đi kèm.
