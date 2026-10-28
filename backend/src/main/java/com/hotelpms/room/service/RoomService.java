@@ -1,5 +1,6 @@
-package com.hotelpms.room.service;
+﻿package com.hotelpms.room.service;
 
+import com.hotelpms.booking.service.RoomAllocationService;
 import com.hotelpms.room.dto.CreatePhysicalRoomRequest;
 import com.hotelpms.room.dto.PhysicalRoomResponse;
 import com.hotelpms.room.dto.RoomTypeRequest;
@@ -10,6 +11,7 @@ import com.hotelpms.room.entity.RoomType;
 import com.hotelpms.room.repository.PhysicalRoomRepository;
 import com.hotelpms.room.repository.RoomTypeRepository;
 import com.hotelpms.shared.api.ApiException;
+import java.time.Instant;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -20,10 +22,14 @@ public class RoomService {
 
     private final RoomTypeRepository roomTypes;
     private final PhysicalRoomRepository physicalRooms;
+    private final RoomAllocationService allocation;
 
-    public RoomService(RoomTypeRepository roomTypes, PhysicalRoomRepository physicalRooms) {
+    public RoomService(RoomTypeRepository roomTypes,
+                       PhysicalRoomRepository physicalRooms,
+                       RoomAllocationService allocation) {
         this.roomTypes = roomTypes;
         this.physicalRooms = physicalRooms;
+        this.allocation = allocation;
     }
 
     // ── Public API ─────────────────────────────────────────────────────────────
@@ -38,6 +44,34 @@ public class RoomService {
         return roomTypes.findActiveByIdWithRoomCount(id)
                 .orElseThrow(() -> new ApiException(
                         HttpStatus.NOT_FOUND, "ROOM_TYPE_NOT_FOUND", "Loai phong khong ton tai"));
+    }
+
+    /**
+     * M2-04: Tra ve danh sach loai phong co it nhat 1 phong kha dung
+     * trong khoang [startAt, endAt) va maxOccupancy >= guests.
+     *
+     * Khong khoa -- chi doc snapshot. Khoa thuc su xay ra khi tao booking hold.
+     * Khong dung activeRoomCount de suy ra kha dung theo thoi gian.
+     *
+     * @param startAt bat dau khoang thoi gian (inclusive)
+     * @param endAt   ket thuc khoang thoi gian (exclusive)
+     * @param guests  so khach; loc loai phong co maxOccupancy >= guests
+     * @param now     thoi diem hien tai de tinh hold con hieu luc
+     */
+    @Transactional(readOnly = true)
+    public List<RoomTypeResponse> listAvailableRoomTypes(Instant startAt, Instant endAt,
+                                                         int guests, Instant now) {
+        // Lay roomTypeId co phong trong
+        List<Long> availableTypeIds = allocation.findAvailableRoomTypeIds(startAt, endAt, now);
+        if (availableTypeIds.isEmpty()) return List.of();
+
+        // Lay DTO cua cac loai phong do, loc theo so khach
+        return availableTypeIds.stream()
+                .map(id -> roomTypes.findActiveByIdWithRoomCount(id))
+                .filter(opt -> opt.isPresent())
+                .map(opt -> opt.get())
+                .filter(rt -> rt.maxOccupancy() >= guests)
+                .toList();
     }
 
     // ── Admin: RoomType ────────────────────────────────────────────────────────
@@ -61,8 +95,6 @@ public class RoomService {
                 req.basePricePerNight()
         );
         roomTypes.save(rt);
-        // Dung findByIdWithRoomCount (ke ca inactive) thay vi findActiveByIdWithRoomCount
-        // vi RoomType moi tao co the chua duoc flush vao query active
         return roomTypes.findByIdWithRoomCount(rt.getId()).orElseThrow();
     }
 
@@ -82,7 +114,7 @@ public class RoomService {
         rt.setDescription(req.description());
         rt.setMaxOccupancy(req.maxOccupancy());
         rt.setBasePricePerNight(req.basePricePerNight());
-        roomTypes.saveAndFlush(rt); // flush de JPQL query ben duoi thay du lieu moi nhat
+        roomTypes.saveAndFlush(rt);
         return roomTypes.findByIdWithRoomCount(id).orElseThrow();
     }
 
@@ -92,7 +124,6 @@ public class RoomService {
                 .orElseThrow(() -> new ApiException(
                         HttpStatus.NOT_FOUND, "ROOM_TYPE_NOT_FOUND", "Loai phong khong ton tai"));
 
-        // Dung COUNT query thay .size() de khong load ca list vao memory
         long activeCount = physicalRooms.countByRoomTypeIdAndActiveTrue(id);
         if (activeCount > 0) {
             throw new ApiException(HttpStatus.CONFLICT, "ROOM_TYPE_HAS_ACTIVE_ROOMS",
@@ -162,7 +193,6 @@ public class RoomService {
                 .orElseThrow(() -> new ApiException(
                         HttpStatus.NOT_FOUND, "PHYSICAL_ROOM_NOT_FOUND", "Phong khong ton tai"));
 
-        // Khong cho an phong dang co booking active -- bao toan du lieu booking
         if (physicalRooms.hasActiveBookings(id)) {
             throw new ApiException(HttpStatus.CONFLICT, "ROOM_HAS_ACTIVE_BOOKINGS",
                     "Khong the an phong dang co booking PENDING_PAYMENT hoac CONFIRMED");
