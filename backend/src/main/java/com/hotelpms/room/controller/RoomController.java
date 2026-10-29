@@ -1,4 +1,4 @@
-﻿package com.hotelpms.room.controller;
+package com.hotelpms.room.controller;
 
 import com.hotelpms.room.dto.RoomTypeResponse;
 import com.hotelpms.room.service.RoomService;
@@ -44,11 +44,10 @@ public class RoomController {
      * Tra ve danh sach loai phong co it nhat 1 phong vat ly kha dung
      * trong khoang [startAt, endAt) va maxOccupancy >= guests.
      *
-     * Endpoint PUBLIC -- khong can dang nhap.
-     * Khong dung activeRoomCount de suy ra tinh trang tuong lai.
+     * Endpoint PUBLIC. Khong dung activeRoomCount de suy ra tinh trang tuong lai.
      *
-     * @param startAt  ISO-8601 instant (e.g. 2026-11-01T14:00:00Z) -- inclusive
-     * @param endAt    ISO-8601 instant -- exclusive
+     * @param startAt  ISO-8601 instant, e.g. 2026-11-01T14:00:00Z (inclusive)
+     * @param endAt    ISO-8601 instant (exclusive)
      * @param guests   so khach; min 1, max 10
      */
     @GetMapping("/available")
@@ -56,8 +55,6 @@ public class RoomController {
             @RequestParam Instant startAt,
             @RequestParam Instant endAt,
             @RequestParam(defaultValue = "1") int guests) {
-
-        // Validate input
         if (!endAt.isAfter(startAt)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DATE_RANGE",
                     "endAt phai sau startAt");
@@ -66,7 +63,6 @@ public class RoomController {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_GUEST_COUNT",
                     "So khach phai tu 1 den 10");
         }
-
         return rooms.listAvailableRoomTypes(startAt, endAt, guests, Instant.now());
     }
 }

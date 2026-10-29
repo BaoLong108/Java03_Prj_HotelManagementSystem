@@ -1,4 +1,4 @@
-﻿package com.hotelpms.room;
+package com.hotelpms.room;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -15,7 +15,6 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,21 +28,12 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestContext;
 import org.springframework.test.context.TestExecutionListeners;
 import org.springframework.test.context.support.AbstractTestExecutionListener;
-import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * M2-04 — Kiem tra truy van phong vat ly va khoa giu cho.
- *
- * Pham vi:
- * - findAvailableRoomTypeIds: phan biet booking overlap/het han/block/released.
- * - findAndLockAvailablePhysicalRoom: khoa row va kiem tra overlap chinh xac.
- * - GET /api/v1/rooms/available: endpoint public, validate param.
- * - Bien gioi [startAt, endAt): booking ket thuc dung startAt -> khong overlap.
- * - Concurrency: hai request dong thoi, chi mot thanh cong.
- *
- * Owner: Le Phuoc Sang (PhuocSang). Khong chinh sua fixture cua test khac.
+ * M2-04 — Kiem tra truy van phong vat ly va endpoint /api/v1/rooms/available.
+ * Owner: Le Phuoc Sang (PhuocSang).
  */
 @ActiveProfiles("dev")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -53,7 +43,6 @@ import tools.jackson.databind.ObjectMapper;
         mergeMode = TestExecutionListeners.MergeMode.MERGE_WITH_DEFAULTS)
 class RoomAvailabilityQueryTest {
 
-    // ── Embedded postgres ──────────────────────────────────────────────────────
     private static EmbeddedPostgres postgres;
 
     @DynamicPropertySource
@@ -69,7 +58,7 @@ class RoomAvailabilityQueryTest {
             props.add("spring.datasource.username", () -> System.getenv("TEST_DB_USER"));
             props.add("spring.datasource.password", () -> System.getenv("TEST_DB_PASSWORD"));
         }
-        props.add("app.jwt.secret", () -> "avail-test-signing-key-at-least-thirty-two-chars");
+        props.add("app.jwt.secret", () -> "avail-test-signing-key-at-least-thirty-two-chars!!");
         props.add("app.jwt.access-token-ttl-seconds", () -> "3600");
         props.add("app.demo-seed.enabled", () -> "true");
         props.add("app.demo-seed.password", () -> "TestDemo123!");
@@ -82,12 +71,10 @@ class RoomAvailabilityQueryTest {
         }
     }
 
-    // ── Fixtures ───────────────────────────────────────────────────────────────
-    // Dung ID cao de khong xung dot voi V2 seed (STANDARD 101-105, DELUXE 201-204...)
-    private static final long RT_ID   = 9001L;  // RoomType
-    private static final long PR_A    = 90011L; // PhysicalRoom A (trong fixture)
-    private static final long PR_B    = 90012L; // PhysicalRoom B (trong fixture)
-    private static final long STAFF_ID = 2L;    // admin@hotel.dev (id=2 trong V2 seed)
+    private static final long RT_ID = 9001L;
+    private static final long PR_A  = 90011L;
+    private static final long PR_B  = 90012L;
+    private static final long STAFF_ID = 2L;
 
     @Value("${local.server.port}") private int port;
     @Autowired private JdbcTemplate jdbc;
@@ -100,291 +87,199 @@ class RoomAvailabilityQueryTest {
 
     @BeforeEach
     void setUp() {
-        // Xoa du lieu fixtures cu, giu V2 seed
         jdbc.update("DELETE FROM bookings WHERE room_type_id = ?", RT_ID);
         jdbc.update("DELETE FROM room_blocks WHERE physical_room_id IN (?, ?)", PR_A, PR_B);
-
-        // Tao room type rieng cho test nay
         jdbc.update("""
-            INSERT INTO room_types (id, code, name, description, max_occupancy, base_price_per_night, is_active)
-            VALUES (?, 'AVAIL_TEST', 'Availability Test Room', 'Test desc', 2, 1000000.00, true)
-            ON CONFLICT (id) DO UPDATE SET is_active = true, max_occupancy = 2
-        """, RT_ID);
-
-        // Tao 2 phong vat ly
+            INSERT INTO room_types (id,code,name,description,max_occupancy,base_price_per_night,is_active)
+            VALUES (?,?,?,?,?,?,true)
+            ON CONFLICT (id) DO UPDATE SET is_active=true, max_occupancy=2
+            """, RT_ID, "AVAIL_TEST", "Availability Test Room", "Test", (short) 2, new java.math.BigDecimal("1000000.00"));
         jdbc.update("""
-            INSERT INTO physical_rooms (id, room_type_id, room_number, floor_number, is_active)
-            VALUES (?, ?, 'AVAIL-A', 9, true)
-            ON CONFLICT (id) DO UPDATE SET is_active = true
-        """, PR_A, RT_ID);
+            INSERT INTO physical_rooms (id,room_type_id,room_number,floor_number,is_active)
+            VALUES (?,?,?,9,true) ON CONFLICT (id) DO UPDATE SET is_active=true
+            """, PR_A, RT_ID, "AVAIL-A");
         jdbc.update("""
-            INSERT INTO physical_rooms (id, room_type_id, room_number, floor_number, is_active)
-            VALUES (?, ?, 'AVAIL-B', 9, true)
-            ON CONFLICT (id) DO UPDATE SET is_active = true
-        """, PR_B, RT_ID);
+            INSERT INTO physical_rooms (id,room_type_id,room_number,floor_number,is_active)
+            VALUES (?,?,?,9,true) ON CONFLICT (id) DO UPDATE SET is_active=true
+            """, PR_B, RT_ID, "AVAIL-B");
     }
 
-    // ── Test cases ─────────────────────────────────────────────────────────────
-
-    /** (a) Phong khong co booking/block -> available. */
+    // (a) Phong khong co booking/block -> available
     @Test
-    void roomWithNoBookingOrBlock_isAvailable() {
-        Instant start = future(5);
-        Instant end   = future(7);
-        Instant now   = Instant.now();
-
-        List<Long> available = allocationService.findAvailableRoomTypeIds(start, end, now);
-        assertThat(available).contains(RT_ID);
-
-        Optional<Long> locked = allocationService.findAndLockAvailablePhysicalRoom(RT_ID, start, end, now);
-        assertThat(locked).isPresent();
+    void noBookingOrBlock_roomIsAvailable() {
+        Instant s = f(5), e = f(7), now = Instant.now();
+        assertThat(allocationService.findAvailableRoomTypeIds(s, e, now)).contains(RT_ID);
+        assertThat(allocationService.findAndLockAvailablePhysicalRoom(RT_ID, s, e, now)).isPresent();
     }
 
-    /** (b) Phong co booking CONFIRMED overlap -> khong available. */
+    // (b) Booking CONFIRMED overlap -> khong available
     @Test
-    void roomWithConfirmedBookingOverlap_isNotAvailable() {
-        Instant start = future(10);
-        Instant end   = future(12);
-        Instant now   = Instant.now();
-
-        // Dat booking CONFIRMED tren ca 2 phong
-        insertBooking(91L, PR_A, "BK-CONF-A", "CONFIRMED", start, end, now.minus(5, ChronoUnit.MINUTES));
-        insertBooking(92L, PR_B, "BK-CONF-B", "CONFIRMED", start, end, now.minus(5, ChronoUnit.MINUTES));
-
-        List<Long> available = allocationService.findAvailableRoomTypeIds(start, end, now);
-        assertThat(available).doesNotContain(RT_ID);
+    void confirmedBookingOverlap_roomNotAvailable() {
+        Instant s = f(10), e = f(12), now = Instant.now();
+        insertBooking(91L, PR_A, "BK-CB-A", "CONFIRMED", s, e, now.minus(5, ChronoUnit.MINUTES));
+        insertBooking(92L, PR_B, "BK-CB-B", "CONFIRMED", s, e, now.minus(5, ChronoUnit.MINUTES));
+        assertThat(allocationService.findAvailableRoomTypeIds(s, e, now)).doesNotContain(RT_ID);
     }
 
-    /** (c) Phong co PENDING_PAYMENT con hold overlap -> khong available. */
+    // (c) PENDING_PAYMENT con hold -> khong available
     @Test
-    void roomWithActiveHoldOverlap_isNotAvailable() {
-        Instant start   = future(15);
-        Instant end     = future(17);
-        Instant now     = Instant.now();
-        Instant holdExp = now.plus(15, ChronoUnit.MINUTES); // hold chua het han
-
-        insertBooking(93L, PR_A, "BK-HOLD-A", "PENDING_PAYMENT", start, end, holdExp);
-        insertBooking(94L, PR_B, "BK-HOLD-B", "PENDING_PAYMENT", start, end, holdExp);
-
-        List<Long> available = allocationService.findAvailableRoomTypeIds(start, end, now);
-        assertThat(available).doesNotContain(RT_ID);
+    void activeHoldOverlap_roomNotAvailable() {
+        Instant s = f(15), e = f(17), now = Instant.now();
+        Instant holdExp = now.plus(15, ChronoUnit.MINUTES);
+        insertBooking(93L, PR_A, "BK-AH-A", "PENDING_PAYMENT", s, e, holdExp);
+        insertBooking(94L, PR_B, "BK-AH-B", "PENDING_PAYMENT", s, e, holdExp);
+        assertThat(allocationService.findAvailableRoomTypeIds(s, e, now)).doesNotContain(RT_ID);
     }
 
-    /** (d) Phong co PENDING_PAYMENT da het hold (expired) -> van available. */
+    // (d) PENDING_PAYMENT hold het han -> van available
     @Test
-    void roomWithExpiredHold_isAvailable() {
-        Instant start   = future(20);
-        Instant end     = future(22);
-        Instant now     = Instant.now();
-        Instant holdExp = now.minus(5, ChronoUnit.MINUTES); // hold da het han
-
-        insertBooking(95L, PR_A, "BK-EXP-A", "PENDING_PAYMENT", start, end, holdExp);
-        insertBooking(96L, PR_B, "BK-EXP-B", "PENDING_PAYMENT", start, end, holdExp);
-
-        List<Long> available = allocationService.findAvailableRoomTypeIds(start, end, now);
-        assertThat(available).contains(RT_ID);
+    void expiredHold_roomStillAvailable() {
+        Instant s = f(20), e = f(22), now = Instant.now();
+        Instant holdExp = now.minus(5, ChronoUnit.MINUTES);
+        insertBooking(95L, PR_A, "BK-EH-A", "PENDING_PAYMENT", s, e, holdExp);
+        insertBooking(96L, PR_B, "BK-EH-B", "PENDING_PAYMENT", s, e, holdExp);
+        assertThat(allocationService.findAvailableRoomTypeIds(s, e, now)).contains(RT_ID);
     }
 
-    /** (e) Phong co active block overlap -> khong available. */
+    // (e) Active block overlap -> khong available
     @Test
-    void roomWithActiveBlockOverlap_isNotAvailable() {
-        Instant start = future(25);
-        Instant end   = future(27);
-        Instant now   = Instant.now();
-
-        // Block ca 2 phong (released_at IS NULL = active)
-        insertBlock(901L, PR_A, start, end);
-        insertBlock(902L, PR_B, start, end);
-
-        List<Long> available = allocationService.findAvailableRoomTypeIds(start, end, now);
-        assertThat(available).doesNotContain(RT_ID);
+    void activeBlock_roomNotAvailable() {
+        Instant s = f(25), e = f(27), now = Instant.now();
+        insertBlock(901L, PR_A, s, e);
+        insertBlock(902L, PR_B, s, e);
+        assertThat(allocationService.findAvailableRoomTypeIds(s, e, now)).doesNotContain(RT_ID);
     }
 
-    /** (f) Phong co released block overlap -> van available. */
+    // (f) Released block overlap -> van available
     @Test
-    void roomWithReleasedBlockOverlap_isAvailable() {
-        Instant start    = future(30);
-        Instant end      = future(32);
-        Instant now      = Instant.now();
-        Instant released = now.minus(1, ChronoUnit.HOURS);
-
-        // Block da duoc giai phong (released_at IS NOT NULL)
-        insertReleasedBlock(903L, PR_A, start, end, released);
-        insertReleasedBlock(904L, PR_B, start, end, released);
-
-        List<Long> available = allocationService.findAvailableRoomTypeIds(start, end, now);
-        assertThat(available).contains(RT_ID);
+    void releasedBlock_roomStillAvailable() {
+        Instant s = f(30), e = f(32), now = Instant.now();
+        insertReleasedBlock(903L, PR_A, s, e, now.minus(1, ChronoUnit.HOURS));
+        insertReleasedBlock(904L, PR_B, s, e, now.minus(1, ChronoUnit.HOURS));
+        assertThat(allocationService.findAvailableRoomTypeIds(s, e, now)).contains(RT_ID);
     }
 
-    /**
-     * (g) Khoang [startAt, endAt): booking ket thuc dung luc startAt yeu cau -> KHONG overlap.
-     * Hai ky ke nhau: [D, D+2) va [D+2, D+4) -> co the dat lien tiep.
-     */
+    // (g) Khoang ke nhau [D,D+2) va [D+2,D+4): KHONG overlap
     @Test
     void adjacentPeriods_doNotOverlap() {
-        Instant d    = future(35);
-        Instant dP2  = d.plus(2, ChronoUnit.DAYS);
-        Instant dP4  = d.plus(4, ChronoUnit.DAYS);
-        Instant now  = Instant.now();
-        Instant holdExp = now.plus(15, ChronoUnit.MINUTES);
-
-        // Booking ky 1: [d, d+2)
-        insertBooking(97L, PR_A, "BK-ADJ-A", "CONFIRMED", d, dP2, now.minus(1, ChronoUnit.HOURS));
-
-        // Truy van ky 2: [d+2, d+4) -> khong overlap voi ky 1
-        List<Long> available = allocationService.findAvailableRoomTypeIds(dP2, dP4, now);
-        assertThat(available).contains(RT_ID);
-
-        Optional<Long> locked = allocationService.findAndLockAvailablePhysicalRoom(RT_ID, dP2, dP4, now);
-        assertThat(locked).isPresent();
-        // Phong bi chon phai la PR_A hoac PR_B
-        assertThat(locked.get()).isIn(PR_A, PR_B);
+        Instant d = f(35), dP2 = d.plus(2, ChronoUnit.DAYS), dP4 = d.plus(4, ChronoUnit.DAYS);
+        Instant now = Instant.now();
+        insertBooking(97L, PR_A, "BK-ADJ", "CONFIRMED", d, dP2, now.minus(1, ChronoUnit.HOURS));
+        // Phong B con trong trong ca 2 ky, phong A chi bi chiem ky 1
+        List<Long> avail = allocationService.findAvailableRoomTypeIds(dP2, dP4, now);
+        assertThat(avail).contains(RT_ID);
     }
 
-    /** (h) Filter guests: maxOccupancy=2, guests=3 -> khong co phong nao phu hop. */
+    // (h) guests filter: maxOccupancy=2, guests=3 -> khong co phong
     @Test
-    void guestFilter_excludesRoomTypeWhenOccupancyInsufficient() {
-        Instant start = future(40);
-        Instant end   = future(42);
-
-        List<com.hotelpms.room.dto.RoomTypeResponse> result =
-                roomService.listAvailableRoomTypes(start, end, 3, Instant.now());
-
-        // RT_ID co maxOccupancy=2 < 3 nen khong xuat hien
+    void guestFilter_tooManyGuests_excluded() {
+        Instant s = f(40), e = f(42);
+        var result = roomService.listAvailableRoomTypes(s, e, 3, Instant.now());
         assertThat(result.stream().map(r -> r.id()).toList()).doesNotContain(RT_ID);
     }
 
-    /** (h2) Filter guests: maxOccupancy=2, guests=2 -> co phong. */
+    // (h2) guests=2 -> co phong
     @Test
-    void guestFilter_includesRoomTypeWhenOccupancySufficient() {
-        Instant start = future(43);
-        Instant end   = future(45);
-
-        List<com.hotelpms.room.dto.RoomTypeResponse> result =
-                roomService.listAvailableRoomTypes(start, end, 2, Instant.now());
-
+    void guestFilter_exactCapacity_included() {
+        Instant s = f(43), e = f(45);
+        var result = roomService.listAvailableRoomTypes(s, e, 2, Instant.now());
         assertThat(result.stream().map(r -> r.id()).toList()).contains(RT_ID);
     }
 
-    /** (i) API endpoint validate: endAt <= startAt -> 400. */
+    // (i) API: endAt == startAt -> 400
     @Test
-    void availableEndpoint_rejectsBadDateRange() throws Exception {
-        Instant start = future(50);
-        Instant end   = start; // bang nhau -> invalid
-
-        HttpResponse<String> res = get("/api/v1/rooms/available?startAt=" + start + "&endAt=" + end + "&guests=1");
+    void availableEndpoint_equalDates_returns400() throws Exception {
+        Instant s = f(50);
+        var res = get("/api/v1/rooms/available?startAt=" + s + "&endAt=" + s + "&guests=1");
         assertThat(res.statusCode()).isEqualTo(400);
     }
 
-    /** (i2) API endpoint validate: guests=0 -> 400. */
+    // (i2) guests=0 -> 400
     @Test
-    void availableEndpoint_rejectsZeroGuests() throws Exception {
-        Instant start = future(55);
-        Instant end   = future(57);
-
-        HttpResponse<String> res = get("/api/v1/rooms/available?startAt=" + start + "&endAt=" + end + "&guests=0");
+    void availableEndpoint_zeroGuests_returns400() throws Exception {
+        Instant s = f(55), e = f(57);
+        var res = get("/api/v1/rooms/available?startAt=" + s + "&endAt=" + e + "&guests=0");
         assertThat(res.statusCode()).isEqualTo(400);
     }
 
-    /** (i3) API endpoint: hop le -> 200, tra danh sach phong trong. */
+    // (i3) hop le -> 200 co RT_ID
     @Test
-    void availableEndpoint_returns200WithAvailableRooms() throws Exception {
-        Instant start = future(60);
-        Instant end   = future(62);
-
-        HttpResponse<String> res = get("/api/v1/rooms/available?startAt=" + start + "&endAt=" + end + "&guests=1");
+    void availableEndpoint_validParams_returns200WithRooms() throws Exception {
+        Instant s = f(60), e = f(62);
+        var res = get("/api/v1/rooms/available?startAt=" + s + "&endAt=" + e + "&guests=1");
         assertThat(res.statusCode()).isEqualTo(200);
-
         JsonNode body = json.readTree(res.body());
         assertThat(body.isArray()).isTrue();
-        // Phai co RT_ID trong ket qua
         boolean found = false;
         for (JsonNode node : body) {
             if (node.path("id").asLong() == RT_ID) { found = true; break; }
         }
-        assertThat(found).as("RT_ID %d should be in available list", RT_ID).isTrue();
+        assertThat(found).as("RT_ID %d should appear in /available response", RT_ID).isTrue();
     }
 
-    /**
-     * (j) Concurrency: 2 request dong thoi cung 1 phong kha dung.
-     * Khi ca 2 goi findAndLockAvailablePhysicalRoom, chi 1 lay duoc phong
-     * (transaction 2 thay phong da bi khoa nen skip hoac thay khong con phong trong).
-     * Chay trong cung 1 thread nen khong test thuc su lock -- kiem tra logic filter.
-     */
+    // (j) Sau khi lay phong + tao booking, khong con phong
     @Test
-    void concurrentAllocation_bothCallsGetDistinctRooms_orSecondGetsEmpty() {
-        // Chi 1 phong active
-        jdbc.update("UPDATE physical_rooms SET is_active = false WHERE id = ?", PR_B);
+    void afterHoldCreated_roomUnavailable() {
+        jdbc.update("UPDATE physical_rooms SET is_active=false WHERE id=?", PR_B);
+        Instant s = f(65), e = f(67), now = Instant.now();
 
-        Instant start = future(65);
-        Instant end   = future(67);
-        Instant now   = Instant.now();
-
-        // Goi thu nhat lay phong
-        Optional<Long> first = allocationService.findAndLockAvailablePhysicalRoom(RT_ID, start, end, now);
+        Optional<Long> first = allocationService.findAndLockAvailablePhysicalRoom(RT_ID, s, e, now);
         assertThat(first).isPresent();
 
-        // Sau khi goi thu nhat, simulate da tao booking tren phong do
-        Instant holdExp = now.plus(15, ChronoUnit.MINUTES);
-        insertBooking(98L, first.get(), "BK-CONC-1", "PENDING_PAYMENT", start, end, holdExp);
+        insertBooking(98L, first.get(), "BK-CONC", "PENDING_PAYMENT", s, e,
+                      now.plus(15, ChronoUnit.MINUTES));
 
-        // Goi thu hai: phong duy nhat da bi giu -> khong con phong
-        Optional<Long> second = allocationService.findAndLockAvailablePhysicalRoom(RT_ID, start, end, now);
+        Optional<Long> second = allocationService.findAndLockAvailablePhysicalRoom(RT_ID, s, e, now);
         assertThat(second).isEmpty();
 
-        // Khoi phuc PR_B
-        jdbc.update("UPDATE physical_rooms SET is_active = true WHERE id = ?", PR_B);
+        jdbc.update("UPDATE physical_rooms SET is_active=true WHERE id=?", PR_B);
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────────
+    // ── helpers ───────────────────────────────────────────────────────────────
 
-    /** Instant N ngay ke tu bay gio (truncated to hours de test on dinh). */
-    private Instant future(int days) {
+    private Instant f(int days) {
         return Instant.now().plus(days, ChronoUnit.DAYS).truncatedTo(ChronoUnit.HOURS);
     }
 
-    private void insertBooking(long id, long physicalRoomId, String code, String status,
-                               Instant start, Instant end, Instant holdExpires) {
-        // customer_id = 3 (customer@hotel-pms.test tu demo seed)
+    private void insertBooking(long id, long physRoomId, String code, String status,
+                               Instant s, Instant e, Instant holdExp) {
         jdbc.update("""
             INSERT INTO bookings
-              (id, booking_code, customer_id, room_type_id, physical_room_id, guest_count,
-               start_at, end_at, hold_expires_at, status,
-               base_amount, discount_rate, discount_amount, payable_amount)
-            VALUES (?, ?, 3, ?, ?, 1, ?, ?, ?, ?,
-                    1000000.00, 0.00, 0.00, 1000000.00)
+              (id,booking_code,customer_id,room_type_id,physical_room_id,guest_count,
+               start_at,end_at,hold_expires_at,status,
+               base_amount,discount_rate,discount_amount,payable_amount)
+            VALUES (?,?,3,?,?,1,?,?,?,?,
+                    1000000.00,0.00,0.00,1000000.00)
             ON CONFLICT (id) DO NOTHING
-        """, id, code, RT_ID, physicalRoomId,
-             java.sql.Timestamp.from(start), java.sql.Timestamp.from(end),
-             java.sql.Timestamp.from(holdExpires), status);
+            """, id, code, RT_ID, physRoomId,
+             ts(s), ts(e), ts(holdExp), status);
     }
 
-    private void insertBlock(long id, long physicalRoomId, Instant start, Instant end) {
+    private void insertBlock(long id, long physRoomId, Instant s, Instant e) {
         jdbc.update("""
             INSERT INTO room_blocks
-              (id, physical_room_id, start_at, end_at, reason, created_by_user_id, created_at)
-            VALUES (?, ?, ?, ?, 'Test block', ?, NOW())
+              (id,physical_room_id,start_at,end_at,reason,created_by_user_id,created_at)
+            VALUES (?,?,?,?,'Test block',?,NOW())
             ON CONFLICT (id) DO NOTHING
-        """, id, physicalRoomId,
-             java.sql.Timestamp.from(start), java.sql.Timestamp.from(end), STAFF_ID);
+            """, id, physRoomId, ts(s), ts(e), STAFF_ID);
     }
 
-    private void insertReleasedBlock(long id, long physicalRoomId,
-                                     Instant start, Instant end, Instant releasedAt) {
+    private void insertReleasedBlock(long id, long physRoomId, Instant s, Instant e, Instant rel) {
         jdbc.update("""
             INSERT INTO room_blocks
-              (id, physical_room_id, start_at, end_at, reason, created_by_user_id, created_at,
-               released_by_user_id, released_at)
-            VALUES (?, ?, ?, ?, 'Released block', ?, NOW(), ?, ?)
+              (id,physical_room_id,start_at,end_at,reason,created_by_user_id,created_at,
+               released_by_user_id,released_at)
+            VALUES (?,?,?,?,'Released block',?,NOW(),?,?)
             ON CONFLICT (id) DO NOTHING
-        """, id, physicalRoomId,
-             java.sql.Timestamp.from(start), java.sql.Timestamp.from(end), STAFF_ID,
-             STAFF_ID, java.sql.Timestamp.from(releasedAt));
+            """, id, physRoomId, ts(s), ts(e), STAFF_ID, STAFF_ID, ts(rel));
     }
+
+    private java.sql.Timestamp ts(Instant i) { return java.sql.Timestamp.from(i); }
 
     private HttpResponse<String> get(String path) throws Exception {
-        var req = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
-                .timeout(Duration.ofSeconds(20)).GET().build();
-        return HTTP.send(req, HttpResponse.BodyHandlers.ofString());
+        return HTTP.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+                        .timeout(Duration.ofSeconds(20)).GET().build(),
+                HttpResponse.BodyHandlers.ofString());
     }
 }
