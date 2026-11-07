@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { readStay, validDate } from '../rooms/search'
 import { useAuth } from '../auth/AuthProvider'
@@ -16,9 +16,11 @@ import {
   toCheckOutIso,
 } from './types'
 import type { BookingResponse, PriceQuote, RoomType } from './types'
-import { errorMessage } from '../../shared/api/client'
+import { apiAssetUrl, errorMessage } from '../../shared/api/client'
+import '../rooms/rooms.css'
 import { Alert, Badge, Button, Card, EmptyState, Field, LoadingState, PageHeader } from '../../shared/ui'
 import { Icon } from '../../shared/ui/Icon'
+import { VoucherInput } from './VoucherInput'
 
 type Step = 'SEARCH' | 'HOLD' | 'CONFIRMED'
 type ActiveTab = 'BOOKING' | 'MY_BOOKINGS'
@@ -45,7 +47,7 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
   const [guestCount, setGuestCount] = useState<number>(initialStay.adults + initialStay.children)
 
   // Room Catalog
-  const [selectedRoomId, setSelectedRoomId] = useState<number>(0)
+  const [selectedRoomId, setSelectedRoomId] = useState<number>(() => Number(searchParams.get('roomTypeId')) || 0)
   const [searchRetry, setSearchRetry] = useState(0)
   const searchKey = `${checkInDate}|${checkOutDate}|${guestCount}|${searchRetry}`
   const [availability, setAvailability] = useState<{ key: string; rooms?: RoomType[]; error?: string }>({ key: '' })
@@ -60,6 +62,7 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
   const [currentBooking, setCurrentBooking] = useState<BookingResponse | null>(null)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const holdMutation = useRef({ version: 0, busy: false })
 
   // My Bookings State
   const [myBookings, setMyBookings] = useState<BookingResponse[]>([])
@@ -130,17 +133,18 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
     const controller = new AbortController()
     let inFlight = false
     const refresh = async () => {
-      if (inFlight || controller.signal.aborted) return
+      if (inFlight || controller.signal.aborted || holdMutation.current.busy) return
+      const mutationVersion = holdMutation.current.version
       inFlight = true
       setHoldSync({ code, loading: true })
       try {
         const latest = await bookingApi.getByCode(code, controller.signal)
-        if (controller.signal.aborted) return
+        if (controller.signal.aborted || mutationVersion !== holdMutation.current.version) return
         setCurrentBooking(previous => previous?.bookingCode === latest.bookingCode && previous.status === 'PENDING_PAYMENT' ? latest : previous)
         if (latest.status === 'CONFIRMED' || latest.status === 'COMPLETED') setStep('CONFIRMED')
         setHoldSync({ code, loading: false })
       } catch (error) {
-        if (!controller.signal.aborted) setHoldSync({ code, loading: false, error: errorMessage(error) })
+        if (!controller.signal.aborted && mutationVersion === holdMutation.current.version) setHoldSync({ code, loading: false, error: errorMessage(error) })
       } finally { inFlight = false }
     }
     void refresh()
@@ -266,6 +270,12 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
   // Occupancy & Date validation
   const exceedsOccupancy = selectedRoom.id !== 0 && guestCount > selectedRoom.maxOccupancy
   const isInvalidDates = checkOutDate <= checkInDate
+
+  function onVoucherBusyChange(value: boolean) {
+    holdMutation.current = { version: holdMutation.current.version + 1, busy: value }
+    setBusy(value)
+    if (!value) setHoldRetry(current => current + 1)
+  }
 
   return (
     <div className="booking-container">
@@ -430,8 +440,7 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
                             : 'violet'
 
                       return (
-                        <div
-                          key={room.id}
+                        <div key={room.id} className="booking-room-item"><div
                           className={`room-card ${isSelected ? 'selected' : ''}`}
                           onClick={() => setSelectedRoomId(room.id)}
                           role="button"
@@ -439,9 +448,9 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
                           onKeyDown={(e) => e.key === 'Enter' && setSelectedRoomId(room.id)}
                           aria-pressed={isSelected}
                         >
-                          <div className={`room-card-icon ${iconTone}`}>
+                          {room.coverImageUrl ? <img className="booking-room-cover" src={apiAssetUrl(room.coverImageUrl)} alt={`Ảnh bìa ${room.name}`} loading="lazy" /> : <div className={`room-card-icon ${iconTone}`}>
                             <Icon name={room.code.includes('SUITE') ? 'shield' : 'bed'} size={24} />
-                          </div>
+                          </div>}
 
                           <div className="room-card-body">
                             <div className="room-card-header">
@@ -473,7 +482,7 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
                               </div>
                             </div>
                           </div>
-                        </div>
+                        </div><Link className="booking-room-details" to={`/rooms/${room.id}?${new URLSearchParams({ arrival: checkInDate, departure: checkOutDate, adults: String(guestCount), children: '0' })}`}>Xem ảnh & chi tiết {room.name}</Link></div>
                       )
                     })}
                   </div>
@@ -709,7 +718,12 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
                     </dd>
                   </div>
                 </dl>
+                {currentBooking.voucherCode && <p>Mã {currentBooking.voucherCode}: giảm thêm {formatVnd(currentBooking.voucherDiscountAmount ?? 0)} sau ưu đãi hạng.</p>}
               </div>
+
+              {currentBooking.status === 'PENDING_PAYMENT' && <VoucherInput key={currentBooking.bookingCode} booking={currentBooking}
+                disabled={busy || holdUnavailable || syncingHold || Boolean(holdSyncError)} onBusyChange={onVoucherBusyChange}
+                onChange={latest => setCurrentBooking(previous => previous?.bookingCode === latest.bookingCode ? latest : previous)} />}
 
               {/* Action Buttons */}
               {currentBooking.status === 'CANCELLED' ? (
@@ -759,6 +773,7 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
 
                     <Button
                       variant="ghost"
+                      disabled={busy}
                       onClick={() => {
                         setCurrentBooking(null)
                         setStep('SEARCH')
@@ -930,7 +945,12 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
                           <strong>{formatVnd(b.payableAmount)}</strong>
                           {b.discountAmount > 0 && (
                             <div className="small" style={{ color: '#2e7d32' }}>
-                              Đã giảm {formatVnd(b.discountAmount)}
+                              Ưu đãi hạng: −{formatVnd(b.discountAmount)}
+                            </div>
+                          )}
+                          {(b.voucherDiscountAmount ?? 0) > 0 && (
+                            <div className="small" style={{ color: '#2e7d32' }}>
+                              Mã {b.voucherCode}: −{formatVnd(b.voucherDiscountAmount ?? 0)}
                             </div>
                           )}
                         </td>

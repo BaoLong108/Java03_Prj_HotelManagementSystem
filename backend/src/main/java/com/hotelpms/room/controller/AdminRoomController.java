@@ -27,6 +27,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
  */
 @RestController
 @RequestMapping("/api/v1/admin/rooms")
+@org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
 public class AdminRoomController {
 
     private final RoomService rooms;
@@ -81,12 +82,24 @@ public class AdminRoomController {
     }
 
     /** POST /api/v1/admin/rooms/physical */
-    @PostMapping("/physical")
+    @PostMapping(value = "/physical", consumes = "application/json")
     public ResponseEntity<PhysicalRoomResponse> createPhysical(
             @Valid @RequestBody CreatePhysicalRoomRequest req) {
         PhysicalRoomResponse created = rooms.createPhysicalRoom(req);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
                 .path("/{id}").buildAndExpand(created.id()).toUri();
+        return ResponseEntity.created(location).body(created);
+    }
+
+    @PostMapping(value = "/physical", consumes = "multipart/form-data")
+    public ResponseEntity<PhysicalRoomResponse> createWithImages(
+            @Valid @org.springframework.web.bind.annotation.RequestPart("room") CreatePhysicalRoomRequest req,
+            @org.springframework.web.bind.annotation.RequestPart("images") List<org.springframework.web.multipart.MultipartFile> images,
+            @RequestParam int coverIndex,
+            @RequestParam(defaultValue = "false") boolean replaceGallery) {
+        var created = rooms.createPhysicalRoomWithImages(req, images, coverIndex, replaceGallery);
+        URI location = ServletUriComponentsBuilder.fromCurrentRequestUri().path("/{id}")
+                .buildAndExpand(created.id()).toUri();
         return ResponseEntity.created(location).body(created);
     }
 

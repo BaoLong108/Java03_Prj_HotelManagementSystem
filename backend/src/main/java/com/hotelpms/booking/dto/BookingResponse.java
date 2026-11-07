@@ -23,7 +23,10 @@ public record BookingResponse(
         Instant confirmedAt,
         Instant completedAt,
         Instant cancelledAt,
-        Instant expiredAt
+        Instant expiredAt,
+        String voucherCode,
+        BigDecimal voucherDiscountAmount,
+        BigDecimal afterMembershipAmount
 ) {
     public static BookingResponse from(Booking booking) {
         return new BookingResponse(
@@ -44,7 +47,10 @@ public record BookingResponse(
                 booking.getConfirmedAt(),
                 booking.getCompletedAt(),
                 booking.getCancelledAt(),
-                booking.getExpiredAt()
+                booking.getExpiredAt(),
+                booking.getVoucherCode(),
+                booking.getVoucherDiscountAmount(),
+                booking.getAfterMembershipAmount()
         );
     }
 }

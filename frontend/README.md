@@ -25,7 +25,7 @@ Profile backend `dev` có `customer@hotel-pms.test`, `staff@hotel-pms.test`, `ad
 | --- | --- |
 | `/` | Hero ảnh concept, chọn ngày/số khách, giới thiệu và chính sách thành viên |
 | `/login`, `/register` | Gọi API Auth thật; lỗi chung + lỗi từng field; đang gửi; ẩn/hiện mật khẩu |
-| `/account` | Cần đăng nhập; dữ liệu từ login/register hoặc `/auth/me` khi tải lại |
+| `/account` | Cần đăng nhập; Customer xem tier, điểm, chi tiêu và lịch sử điểm phân trang từ API thật; loading/error/retry, tiến độ nâng hạng; Staff/Admin giữ công cụ vận hành |
 | `/rooms` | Tìm phòng/quote từ API thật, chọn ngày/số khách, URL chia sẻ được, đăng nhập quay lại lịch đã chọn |
 | `/rooms/:roomTypeId` | Trạng thái chưa sẵn sàng; chờ API chi tiết, ảnh và tiện nghi |
 | `/booking` | Quote → hold 15 phút → thanh toán demo, snapshot server, tải PDF xác nhận |
@@ -42,6 +42,10 @@ Profile backend `dev` có `customer@hotel-pms.test`, `staff@hotel-pms.test`, `ad
 | Route khác | Trang 404 |
 
 Mặc định gọi API thật. `VITE_USE_FIXTURES=true` chỉ bật dữ liệu mẫu Staff có banner, không dùng để nghiệm thu nghiệp vụ. Không có luồng staff check-in/check-out. Guards ở frontend kiểm soát giao diện; backend đã kiểm tra JWT/RBAC và ownership. Contract hiện tại nằm trong [Sprint 2 completion](../docs/sprint2-completion.md).
+
+Membership `/account` dùng `membershipApi.ts` qua HTTP client chung, giữ AuthProvider hiện có và abort request khi chuyển tài khoản/trang. Component `MembershipPanel` được gắn key theo user id; không lưu tier hoặc điểm tự tính trong session. Contract và các bước nghiệm thu M1-06/M1-07: [bàn giao của Long](../docs/sprint34-long-handover.md). Mở toàn bộ DB/API/FE bằng Compose theo README gốc.
+
+Đổi điểm `/account` dùng `VoucherWallet`/`voucherApi`: gói 50/100/200 điểm tương ứng 400.000/1.000.000/2.200.000 VND. `VoucherInput` tại bước giữ chỗ gọi API áp/gỡ mã, lấy tổng cuối từ server rồi Payment mới chạy. [Contract mã và migration V3](../docs/loyalty-vouchers.md). Cập nhật backend trước để có các endpoint mới.
 
 ## Cấu trúc và người tiếp tục
 

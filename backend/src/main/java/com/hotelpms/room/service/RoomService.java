@@ -20,31 +20,33 @@ public class RoomService {
 
     private final RoomTypeRepository roomTypes;
     private final PhysicalRoomRepository physicalRooms;
+    private final RoomImageService images;
 
-    public RoomService(RoomTypeRepository roomTypes, PhysicalRoomRepository physicalRooms) {
+    public RoomService(RoomTypeRepository roomTypes, PhysicalRoomRepository physicalRooms, RoomImageService images) {
         this.roomTypes = roomTypes;
         this.physicalRooms = physicalRooms;
+        this.images = images;
     }
 
     // ── Public API ─────────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public List<RoomTypeResponse> listActiveRoomTypes() {
-        return roomTypes.findAllActiveWithRoomCount();
+        return enrich(roomTypes.findAllActiveWithRoomCount());
     }
 
     @Transactional(readOnly = true)
     public RoomTypeResponse getRoomType(Long id) {
-        return roomTypes.findActiveByIdWithRoomCount(id)
+        return enrich(java.util.List.of(roomTypes.findActiveByIdWithRoomCount(id)
                 .orElseThrow(() -> new ApiException(
-                        HttpStatus.NOT_FOUND, "ROOM_TYPE_NOT_FOUND", "Loai phong khong ton tai"));
+                        HttpStatus.NOT_FOUND, "ROOM_TYPE_NOT_FOUND", "Loai phong khong ton tai")))).getFirst();
     }
 
     // ── Admin: RoomType ────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public List<RoomTypeResponse> adminListAllRoomTypes() {
-        return roomTypes.findAllWithRoomCount();
+        return enrich(roomTypes.findAllWithRoomCount());
     }
 
     @Transactional
@@ -63,7 +65,7 @@ public class RoomService {
         roomTypes.save(rt);
         // Dung findByIdWithRoomCount (ke ca inactive) thay vi findActiveByIdWithRoomCount
         // vi RoomType moi tao co the chua duoc flush vao query active
-        return roomTypes.findByIdWithRoomCount(rt.getId()).orElseThrow();
+        return enrich(java.util.List.of(roomTypes.findByIdWithRoomCount(rt.getId()).orElseThrow())).getFirst();
     }
 
     @Transactional
@@ -83,7 +85,7 @@ public class RoomService {
         rt.setMaxOccupancy(req.maxOccupancy());
         rt.setBasePricePerNight(req.basePricePerNight());
         roomTypes.saveAndFlush(rt); // flush de JPQL query ben duoi thay du lieu moi nhat
-        return roomTypes.findByIdWithRoomCount(id).orElseThrow();
+        return enrich(java.util.List.of(roomTypes.findByIdWithRoomCount(id).orElseThrow())).getFirst();
     }
 
     @Transactional
@@ -129,13 +131,13 @@ public class RoomService {
                         HttpStatus.NOT_FOUND, "ROOM_TYPE_NOT_FOUND",
                         "Loai phong khong ton tai hoac da bi an"));
 
-        if (physicalRooms.existsByRoomNumberIgnoreCase(req.roomNumber())) {
+        if (physicalRooms.existsByRoomNumberIgnoreCase(req.roomNumber().strip())) {
             throw new ApiException(HttpStatus.CONFLICT, "ROOM_NUMBER_DUPLICATE",
                     "So phong '" + req.roomNumber() + "' da ton tai");
         }
 
         PhysicalRoom room = new PhysicalRoom(rt, req.roomNumber().strip(), req.floorNumber());
-        physicalRooms.save(room);
+        physicalRooms.saveAndFlush(room);
         return PhysicalRoomResponse.from(room);
     }
 
@@ -145,7 +147,7 @@ public class RoomService {
                 .orElseThrow(() -> new ApiException(
                         HttpStatus.NOT_FOUND, "PHYSICAL_ROOM_NOT_FOUND", "Phong khong ton tai"));
 
-        if (physicalRooms.existsByRoomNumberIgnoreCaseAndIdNot(req.roomNumber(), id)) {
+        if (physicalRooms.existsByRoomNumberIgnoreCaseAndIdNot(req.roomNumber().strip(), id)) {
             throw new ApiException(HttpStatus.CONFLICT, "ROOM_NUMBER_DUPLICATE",
                     "So phong '" + req.roomNumber() + "' da ton tai");
         }
@@ -154,6 +156,22 @@ public class RoomService {
         room.setFloorNumber(req.floorNumber());
         physicalRooms.save(room);
         return PhysicalRoomResponse.from(room);
+    }
+
+    @Transactional
+    public PhysicalRoomResponse createPhysicalRoomWithImages(CreatePhysicalRoomRequest req,
+            List<org.springframework.web.multipart.MultipartFile> files, int coverIndex, boolean replaceGallery) {
+        var validated = images.validate(files, coverIndex);
+        roomTypes.lockById(req.roomTypeId()).filter(RoomType::isActive)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "ROOM_TYPE_NOT_FOUND", "Hạng phòng không tồn tại hoặc đã ẩn"));
+        PhysicalRoomResponse created = createPhysicalRoom(req);
+        images.replace(req.roomTypeId(), validated, coverIndex, replaceGallery);
+        return created;
+    }
+
+    private List<RoomTypeResponse> enrich(List<RoomTypeResponse> types) {
+        var metadata = images.metadata(types.stream().map(RoomTypeResponse::id).toList());
+        return types.stream().map(type -> type.withImages(metadata.getOrDefault(type.id(), List.of()))).toList();
     }
 
     @Transactional

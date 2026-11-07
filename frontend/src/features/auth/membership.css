@@ -1,0 +1,8 @@
+.membership-progress { display: grid; gap: 10px; font-size: 12px; margin-block: 8px 22px; }
+.membership-progress progress { width: 100%; height: 9px; accent-color: #d2bd8d; }
+.membership-progress .price { font-size: inherit; color: inherit; }
+.loyalty-stats .price { font-size: inherit; color: inherit; overflow-wrap: anywhere; }
+.loyalty-card .loading-state { color: #e4eadd; }
+.account-main { min-width: 0; }
+.account-main .table-scroll { max-width: 100%; }
+@media (max-width: 650px) { .account-main .card-heading { flex-wrap: wrap; } }

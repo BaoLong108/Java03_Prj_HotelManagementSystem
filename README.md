@@ -21,10 +21,26 @@ frontend/                React + TypeScript + Vite
   src/features/           Mã giao diện theo nghiệp vụ
   src/shared/api/         API client dùng chung
 docs/                    Quy ước kiến trúc, API, cộng tác
-compose.yaml             PostgreSQL cho local
+compose.yaml             PostgreSQL + backend + frontend cho demo
 ```
 
-Backend đã có entity tài khoản, đăng ký/đăng nhập JWT và `/api/v1/auth/me`. Frontend có hai cổng responsive cho khách và Staff/Admin, trang chủ với ảnh concept, tìm phòng/quote thật, hold 15 phút, thanh toán demo, lịch sử booking, PDF và lịch/tra cứu Staff. Auth nối API thật, JWT và menu theo vai trò. Xem [hướng dẫn frontend](frontend/README.md), [nhật ký redesign](docs/frontend-redesign.md) và [hợp đồng API Auth](docs/auth.md). Cộng điểm/nâng hạng, VNPay và báo cáo theo các sprint tiếp theo.
+Backend đã có entity tài khoản, đăng ký/đăng nhập JWT và `/api/v1/auth/me`. Frontend có hai cổng responsive cho khách và Staff/Admin, trang chủ với ảnh concept, tìm phòng/quote thật, hold 15 phút, thanh toán demo, lịch sử booking, PDF và lịch/tra cứu Staff. Auth nối API thật, JWT và menu theo vai trò. Trang `/account` đọc điểm, chi tiêu hợp lệ, hạng và lịch sử tích điểm từ database. Booking đã thanh toán và hoàn tất được cộng điểm một lần, nâng hạng tự động; giữ nguyên giá snapshot cũ. Xem [hướng dẫn frontend](frontend/README.md), [nhật ký redesign](docs/frontend-redesign.md), [hợp đồng API Auth](docs/auth.md) và [bàn giao Sprint 3–4 của Long](docs/sprint34-long-handover.md). VNPay và báo cáo thuộc phần việc riêng của các thành viên.
+
+## Chạy cả hệ thống bằng một lệnh
+
+Customer còn có thể đổi 50/100/200 điểm lấy mã giảm 400.000/1.000.000/2.200.000 VND tại `/account`, rồi nhập mã 6 ký tự ở bước thanh toán. Mã giảm trên giá sau hạng, số phải trả thấp nhất 0 VND. Chi tiết và migration V3: [đổi điểm lấy mã giảm giá](docs/loyalty-vouchers.md).
+
+Cần Docker Desktop/Engine với Compose v2 đang chạy. Tại gốc repository:
+
+```sh
+docker compose up --build -d --wait
+```
+
+Mở [web đăng nhập](http://localhost:5173/login). Tài khoản seed gồm `customer@hotel-pms.test`, `staff@hotel-pms.test` và `admin@hotel-pms.test`. Mật khẩu demo trên database mới là `HotelPmsDemo123!`. Database cũ giữ nguyên mật khẩu đã đặt.
+
+Compose dùng named volume `postgres_data` để giữ dữ liệu. `docker compose stop` hoặc `docker compose down` không xóa dữ liệu. Muốn chạy lại: dùng lệnh `up` ở trên. `.env.example` chứa cấu hình demo công khai, sao chép sang `.env` khi cần đổi port/mật khẩu. Nếu đang chạy local riêng, dừng các server đó hoặc đổi `WEB_PORT`, `API_PORT`, `POSTGRES_PORT` để tránh trùng port. Backend dùng Flyway và `ddl-auto=validate`, không tạo lại bảng mỗi lần chạy.
+
+Kịch bản demo, kiểm thử, giới hạn và cách xem log: [hướng dẫn Sprint 3–4](docs/sprint34-long-handover.md).
 
 ## Chạy local
 

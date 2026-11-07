@@ -12,12 +12,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class RoomAvailabilityService {
  private final JdbcTemplate jdbc;
  public RoomAvailabilityService(JdbcTemplate jdbc) { this.jdbc=jdbc; }
- public record AvailableRoomType(Long id,String code,String name,String description,int maxOccupancy,BigDecimal basePricePerNight,long availableRoomCount) {}
+ public record AvailableRoomType(Long id,String code,String name,String description,int maxOccupancy,BigDecimal basePricePerNight,long availableRoomCount,String coverImageUrl) {}
  @Transactional(readOnly=true)
  public List<AvailableRoomType> search(Instant startAt,Instant endAt,int guestCount) {
   validate(startAt,endAt,guestCount);
   return jdbc.query("""
-   SELECT t.id,t.code,t.name,t.description,t.max_occupancy,t.base_price_per_night,COUNT(r.id) available
+   SELECT t.id,t.code,t.name,t.description,t.max_occupancy,t.base_price_per_night,COUNT(r.id) available,
+    (SELECT '/api/v1/rooms/' || t.id || '/images/' || i.id FROM room_type_images i WHERE i.room_type_id=t.id AND i.is_cover=true) cover_url
    FROM room_types t JOIN physical_rooms r ON r.room_type_id=t.id AND r.is_active=true
    WHERE t.is_active=true AND t.max_occupancy>=?
     AND NOT EXISTS (SELECT 1 FROM bookings b WHERE b.physical_room_id=r.id AND b.start_at<? AND b.end_at>?
@@ -25,7 +26,7 @@ public class RoomAvailabilityService {
     AND NOT EXISTS (SELECT 1 FROM room_blocks x WHERE x.physical_room_id=r.id AND x.released_at IS NULL AND x.start_at<? AND x.end_at>?)
    GROUP BY t.id ORDER BY t.id
    """,(rs,n)->new AvailableRoomType(rs.getLong("id"),rs.getString("code"),rs.getString("name"),rs.getString("description"),
-       rs.getInt("max_occupancy"),rs.getBigDecimal("base_price_per_night"),rs.getLong("available")),
+       rs.getInt("max_occupancy"),rs.getBigDecimal("base_price_per_night"),rs.getLong("available"),rs.getString("cover_url")),
    guestCount,java.sql.Timestamp.from(endAt),java.sql.Timestamp.from(startAt),java.sql.Timestamp.from(Instant.now()),
    java.sql.Timestamp.from(endAt),java.sql.Timestamp.from(startAt));
  }

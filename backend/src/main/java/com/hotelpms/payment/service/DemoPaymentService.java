@@ -13,7 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class DemoPaymentService {
  private final BookingRepository bookings;
  private final PaymentAttemptRepository payments;
- public DemoPaymentService(BookingRepository bookings,PaymentAttemptRepository payments){this.bookings=bookings;this.payments=payments;}
+ private final com.hotelpms.loyalty.VoucherService vouchers;
+ public DemoPaymentService(BookingRepository bookings,PaymentAttemptRepository payments,com.hotelpms.loyalty.VoucherService vouchers){this.bookings=bookings;this.payments=payments;this.vouchers=vouchers;}
  @Transactional(noRollbackFor=ApiException.class)
  public PaymentResponse pay(DemoPaymentRequest request,Long actor) {
   var booking=bookings.findByBookingCodeForUpdate(request.bookingCode())
@@ -29,7 +30,7 @@ public class DemoPaymentService {
   if(booking.getStatus()!=BookingStatus.PENDING_PAYMENT)
    throw new ApiException(HttpStatus.CONFLICT,"INVALID_BOOKING_STATUS","Booking không còn chờ thanh toán");
   if(!booking.getHoldExpiresAt().isAfter(now)){
-   booking.expire(now);bookings.saveAndFlush(booking);
+   booking.expire(now);bookings.saveAndFlush(booking);vouchers.releaseForBooking(booking.getId());
    throw new ApiException(HttpStatus.CONFLICT,"BOOKING_EXPIRED","Đã hết hạn giữ phòng");
   }
   var payment=new PaymentAttempt(booking.getId(),PaymentProvider.DEMO,key,booking.getPayableAmount());
@@ -37,6 +38,7 @@ public class DemoPaymentService {
    payment.markFailed();payments.saveAndFlush(payment);
    return PaymentResponse.from(payment,booking);
   }
+  vouchers.consumeForPayment(booking,now);
   payment.markSucceeded(now);
   payments.saveAndFlush(payment);booking.confirm(now);bookings.saveAndFlush(booking);
   return PaymentResponse.from(payment,booking);

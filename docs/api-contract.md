@@ -4,6 +4,10 @@
 
 Contract Booking, Payment demo, Room availability, PDF và Staff Calendar/Lookup đã triển khai ngày 26/10/2026: [Sprint 2 completion](sprint2-completion.md#contract-đang-chạy). Đây là nguồn hiện tại cho DTO, kiểu tiền và các role; các tài liệu bàn giao cũ giữ lại lịch sử chuẩn bị.
 
+M1-06/M1-07 bổ sung ngày 02/11/2026: [contract membership và lịch sử điểm](sprint34-long-handover.md#api-bàn-giao-m1-07). `GET /api/v1/customers/me/membership` trả tier/điểm/chi tiêu/tiến độ; `GET /api/v1/customers/me/loyalty-awards?page=0&size=10` trả ledger phân trang. Cả hai chỉ cho CUSTOMER, lấy định danh từ JWT và không nhận customerId. API Booking và giá snapshot hiện có giữ nguyên.
+
+Phần mở rộng [đổi điểm lấy mã giảm giá](loyalty-vouchers.md) thêm offers/ví mã/redeem tại `/api/v1/customers/me/vouchers`, áp/gỡ mã tại `/api/v1/bookings/{bookingCode}/voucher`. Khi có mã, BookingResponse bổ sung `afterMembershipAmount`, `voucherCode`, `voucherDiscountAmount`; `payableAmount` là số cuối sau giảm hạng **và** mã. Payment/Loyalty/PDF dùng số cuối này; Quote chưa áp mã và vẫn giữ hợp đồng cũ.
+
 - Prefix: `/api/v1`. JSON dùng `camelCase`; ID dùng `Long` ở Java và JSON number, khớp `BIGINT` trong schema V1.
 - Thời gian gửi/nhận theo ISO 8601 có offset, ví dụ `2026-10-08T12:00:00+07:00`. Khoảng thời gian luôn gồm `startAt`, `endAt` và `startAt < endAt`.
 - Tiền là số thập phân theo VND, không dùng `double` ở backend. Response quote/booking dùng tên trường thống nhất: `baseAmount`, `discountRate`, `payableAmount`.

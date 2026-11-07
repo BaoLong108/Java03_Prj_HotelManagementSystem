@@ -1,6 +1,10 @@
 spring:
   application:
     name: hotel-pms-api
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 30MB
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/hotel_pms}
     username: ${DB_USER:hotel_pms}

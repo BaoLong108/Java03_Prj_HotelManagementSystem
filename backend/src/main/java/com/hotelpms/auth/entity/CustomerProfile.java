@@ -51,4 +51,17 @@ public class CustomerProfile extends AuditedEntity {
     public BigDecimal getEligibleSpendTotal() { return eligibleSpendTotal; }
     public long getPointsBalance() { return pointsBalance; }
     public LoyaltyTier getTierCode() { return tierCode; }
+
+    public void spendPoints(long points) {
+        if (points <= 0 || pointsBalance < points) throw new IllegalArgumentException("Insufficient points");
+        pointsBalance -= points;
+    }
+
+    /** Called with the profile locked, in the same transaction as the award ledger insert. */
+    public void applyLoyaltyAward(BigDecimal amount, long points, LoyaltyTier nextTier) {
+        if (amount.signum() < 0 || points < 0) throw new IllegalArgumentException("Negative loyalty award");
+        eligibleSpendTotal = eligibleSpendTotal.add(amount);
+        pointsBalance = Math.addExact(pointsBalance, points);
+        tierCode = nextTier;
+    }
 }

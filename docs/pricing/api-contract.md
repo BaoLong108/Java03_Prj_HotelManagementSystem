@@ -87,6 +87,8 @@ discountAmount   = baseAmount × discountRate                        // scale 2,
 payableAmount    = baseAmount − discountAmount                      // scale 2, HALF_UP
 ```
 
+Công thức này áp dụng cho **Quote trước mã**. Sau khi tạo hold, Customer có thể [áp mã đổi điểm](../loyalty-vouchers.md) ở checkout; Booking lúc đó có `voucherDiscountAmount`, `afterMembershipAmount` và `payableAmount` cuối sau mã. Payment đọc số cuối từ Booking, không dùng lại Quote hoặc tính lại tier để thu tiền.
+
 Bảng hạng (tham khảo `pricing-rules.md`):
 
 | `appliedTier` | `discountRate` |

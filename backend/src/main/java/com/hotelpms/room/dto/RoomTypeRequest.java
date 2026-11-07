@@ -28,5 +28,6 @@ public record RoomTypeRequest(
 
         @NotNull(message = "Giá mỗi đêm không được null")
         @DecimalMin(value = "0.0", message = "Giá mỗi đêm không được âm")
+        @jakarta.validation.constraints.Digits(integer = 13, fraction = 2)
         BigDecimal basePricePerNight
 ) { }

@@ -86,6 +86,14 @@ async function changeGuestCount(view, value) {
   })
 }
 
+async function enterVoucher(view, value) {
+  const input = view.querySelector('.checkout-voucher input')
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set.call(input, value)
+    input.dispatchEvent(new dom.window.Event('input', { bubbles: true }))
+  })
+}
+
 test('availability stays loading until an actual empty response arrives', async t => {
   const pending = deferred()
   const view = await mount(t, { search: () => pending.promise })
@@ -186,4 +194,61 @@ test('leaving a hold aborts its status read and ignores late confirmation', asyn
   await act(async () => pending.resolve({ ...hold(), status: 'CONFIRMED' }))
   assert.doesNotMatch(view.textContent, /Đặt phòng đã được xác nhận/)
   assert.match(view.textContent, /Chọn loại phòng/)
+})
+
+test('checkout applies the server voucher total, disables payment during mutation, and supports removal', async t => {
+  t.mock.timers.enable({ apis: ['Date', 'setInterval'], now: NOW })
+  const pending = deferred()
+  let current = hold(), submitted
+  const view = await mount(t, {
+    getByCode: async () => current,
+    applyVoucher: async (code, voucher) => { submitted = { code, voucher }; return pending.promise },
+    removeVoucher: async () => { current = hold(); return current },
+  })
+  await click(button(view, 'Tiến hành giữ phòng'))
+  assert.equal(button(view, 'Áp dụng mã').disabled, true)
+  await enterVoucher(view, 'a1b2c3')
+  await click(button(view, 'Áp dụng mã'))
+  assert.deepEqual(submitted, { code: hold().bookingCode, voucher: 'A1B2C3' })
+  assert.equal(button(view, 'Thanh toán Demo ngay').disabled, true)
+  current = { ...hold(), voucherCode: 'A1B2C3', voucherDiscountAmount: 2000000, afterMembershipAmount: 2000000, payableAmount: 0 }
+  await act(async () => pending.resolve(current))
+  assert.match(button(view, 'Thanh toán Demo ngay').textContent, /0/)
+  assert.equal(button(view, 'Thanh toán Demo ngay').disabled, false)
+  assert.match(view.querySelector('.checkout-voucher').textContent, /A1B2C3/)
+  await click(button(view, 'Gỡ mã'))
+  assert.match(button(view, 'Thanh toán Demo ngay').textContent, /2\.000\.000/)
+  assert.ok(view.querySelector('.checkout-voucher input'))
+})
+
+test('invalid voucher errors preserve the server price and allow retry', async t => {
+  t.mock.timers.enable({ apis: ['Date', 'setInterval'], now: NOW })
+  const view = await mount(t, { applyVoucher: async () => { throw new Error('Mã đã sử dụng') } })
+  await click(button(view, 'Tiến hành giữ phòng'))
+  await enterVoucher(view, 'A1B2C3')
+  await click(button(view, 'Áp dụng mã'))
+  assert.match(view.querySelector('.checkout-voucher').textContent, /Mã đã sử dụng/)
+  assert.match(button(view, 'Thanh toán Demo ngay').textContent, /2\.000\.000/)
+  assert.equal(button(view, 'Áp dụng mã').disabled, false)
+})
+
+test('voucher form is disabled at the server hold deadline', async t => {
+  t.mock.timers.enable({ apis: ['Date', 'setInterval'], now: NOW })
+  const view = await mount(t)
+  await click(button(view, 'Tiến hành giữ phòng'))
+  await enterVoucher(view, 'A1B2C3')
+  assert.equal(button(view, 'Áp dụng mã').disabled, false)
+  await act(async () => t.mock.timers.tick(61000))
+  assert.equal(button(view, 'Áp dụng mã').disabled, true)
+})
+
+test('booking history distinguishes tier and voucher reductions alongside the final amount', async t => {
+  const view = await mount(t, { getMyBookings: async () => [{ ...hold(), status: 'CONFIRMED',
+    discountRate: 0.1, discountAmount: 200000, voucherCode: 'A1B2C3', voucherDiscountAmount: 400000,
+    afterMembershipAmount: 1800000, payableAmount: 1400000 }] })
+  await click(button(view, 'Đơn đặt phòng của tôi'))
+  const row = view.querySelector('tbody tr').textContent
+  assert.match(row, /1\.400\.000/)
+  assert.match(row, /Ưu đãi hạng: −200\.000/)
+  assert.match(row, /Mã A1B2C3: −400\.000/)
 })

@@ -2,6 +2,8 @@ import { endSession, readSession } from '../auth/session'
 
 const baseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
 
+export function apiAssetUrl(path: string): string { return `${baseUrl}${path}` }
+
 export class ApiError extends Error {
   readonly status: number
   readonly code?: string
@@ -34,15 +36,16 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const token = options.auth === false ? undefined : options.token ?? readSession()?.accessToken
   let response: Response
+  const multipart = options.body instanceof FormData
   try {
     response = await fetch(`${baseUrl}${path}`, {
       method: options.method ?? 'GET',
       credentials: 'omit',
       headers: {
-        ...(options.body === undefined ? {} : { 'Content-Type': 'application/json' }),
+        ...(options.body === undefined || multipart ? {} : { 'Content-Type': 'application/json' }),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      body: options.body === undefined ? undefined : multipart ? options.body as FormData : JSON.stringify(options.body),
       signal: options.signal,
     })
   } catch (error) {
