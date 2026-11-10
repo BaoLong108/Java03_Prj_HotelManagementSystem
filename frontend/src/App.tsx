@@ -12,7 +12,7 @@ import { StaffLayout as StaffSectionLayout } from './features/staff/StaffLayout'
 import { ForbiddenPage, NotFoundPage, UiKitPage } from './shared/ui/ExamplePages'
 import { ToastProvider } from './shared/ui'
 import { RoomCalendarPage } from './features/staff/calendar/RoomCalendarPage'
-import { BookingSearchPage } from './features/staff/bookings/BookingSearchPage'
+import { StaffBookings } from './features/staff/bookings/DailyBookings'
 
 export default function App() {
   return <ToastProvider><AuthProvider><RouteEffects /><Routes><Route element={<AppLayout />}>
@@ -31,7 +31,7 @@ export default function App() {
     <Route element={<RequireAuth roles={['STAFF', 'ADMIN']} />}>
       <Route path="staff" element={<StaffPage />} />
       <Route element={<StaffSectionLayout />}>
-        <Route path="staff/bookings" element={<BookingSearchPage />} />
+        <Route path="staff/bookings" element={<StaffBookings />} />
         <Route path="staff/calendar" element={<RoomCalendarPage />} />
       </Route>
       <Route path="staff/rooms" element={<RoomOperationsPage />} />

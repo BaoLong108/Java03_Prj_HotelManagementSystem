@@ -7,6 +7,7 @@ import { useServiceHealth } from '../../shared/api/health'
 import { useAuth } from '../auth/AuthProvider'
 import { MembershipBenefits } from '../auth/MembershipBenefits'
 import { addDays, displayDate, hotelToday, validDate } from '../rooms/search'
+import { RoomOperations } from './blocks/RoomOperations'
 
 function ServiceStatus() {
   const { status, retry } = useServiceHealth()
@@ -56,7 +57,7 @@ export function CalendarPage() {
 }
 
 export function RoomOperationsPage() {
-  return <><PageHeader eyebrow="ROOM OPERATIONS" title="Tình trạng phòng" description="Theo dõi phòng vật lý và các khoảng thời gian bị chặn." /><Card><EmptyState icon="bed" title="Danh sách phòng vận hành chưa sẵn sàng" description="Chưa có thông tin phòng hoặc lịch chặn từ máy chủ. Tình trạng khả dụng cần được xác định cho từng khoảng lưu trú." action={<LinkButton to="/staff/calendar" variant="secondary">Mở lịch phòng <Icon name="arrow" size={17} /></LinkButton>} /></Card>
+  return <><PageHeader eyebrow="ROOM OPERATIONS" title="Tình trạng phòng" description="Theo dõi phòng vật lý và các khoảng thời gian bị chặn." /><RoomOperations />
     <section className="operation-availability"><h2>Các nghiệp vụ chưa được hỗ trợ</h2><p className="muted">Các công cụ dưới đây chưa có trong phiên bản khách sạn mini hiện tại.</p><div className="operation-grid">{[
       ['Check-in / Check-out', 'Chưa có quy trình nhận, trả phòng do nhân viên thực hiện.'], ['Housekeeping', 'Chưa có trạng thái dọn phòng hoặc phân công nhân viên.'], ['Folio & phụ thu', 'Chưa có sổ chi phí, quyết toán hoặc dịch vụ bổ sung.'],
     ].map(([title, description]) => <div key={title}><span className="outline-label">CHƯA HỖ TRỢ</span><h3>{title}</h3><p>{description}</p></div>)}</div></section>

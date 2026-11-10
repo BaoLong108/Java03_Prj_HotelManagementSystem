@@ -11,6 +11,8 @@ import { entryLabel, RoomCalendarGrid } from './RoomCalendarGrid'
 import type { CalendarSelection } from './RoomCalendarGrid'
 import type { RoomCalendar } from './roomCalendarTypes'
 import './roomCalendar.css'
+import '../shared/operations.css'
+import { BlockForm, ReleaseBlockButton } from '../blocks/BlockControls'
 
 type LoadState = { key: string; data?: RoomCalendar; error?: string }
 export function RoomCalendarPage() {
@@ -24,6 +26,7 @@ export function RoomCalendarPage() {
   const roomTypeId = /^\d+$/.test(rawType) && Number.isSafeInteger(Number(rawType)) && Number(rawType) > 0 ? Number(rawType) : undefined
   const { from, to } = calendarRange(startDate)
   const [reload, setReload] = useState(0)
+  const [creating, setCreating] = useState(false)
   const key = `${user?.id}|${canReadRooms}|${from}|${to}|${roomTypeId ?? ''}|${reload}`
   const [state, setState] = useState<LoadState>({ key: '' })
   const [roomTypes, setRoomTypes] = useState<{ id: number; name: string }[]>([])
@@ -78,6 +81,7 @@ export function RoomCalendarPage() {
         {roomTypes.map(type => <option value={type.id} key={type.id}>{type.name}</option>)}
       </select></label>
       <Button variant="secondary" onClick={() => setReload(value => value + 1)}>Tải lại</Button>
+      <Button disabled={USE_FIXTURES || !current.data?.rooms.some(room => room.isActive)} onClick={() => setCreating(true)}>Chặn phòng</Button>
     </div><p className="calendar-range">{formatHotelTime(from)} – {formatHotelTime(to)} · Giờ Việt Nam (UTC+07:00)</p></Card>}
     <ul className="calendar-legend" aria-label="Chú thích lịch phòng">
       <li className="legend-confirmed">Đã xác nhận</li><li className="legend-completed">Hoàn tất</li>
@@ -102,6 +106,8 @@ export function RoomCalendarPage() {
           {selection.entry.createdByName && <div><dt>Người tạo</dt><dd>{selection.entry.createdByName}</dd></div>}</>
           : selection.entry.status === 'PENDING_PAYMENT' && <div><dt>Hạn giữ chỗ</dt><dd>{selection.entry.holdExpiresAt ? formatHotelTime(selection.entry.holdExpiresAt) : 'Máy chủ chưa cung cấp'}</dd></div>}
       </dl>
+      {selection.entry.kind === 'BLOCK' && !USE_FIXTURES && <ReleaseBlockButton key={selection.entry.id} id={selection.entry.id} onSuccess={() => { setSelection(null); setReload(n => n + 1) }} />}
     </section>}
+    {creating && current.data && <BlockForm rooms={current.data.rooms} date={startDate} onClose={() => setCreating(false)} onSuccess={() => setReload(n => n + 1)} />}
   </div>
 }
