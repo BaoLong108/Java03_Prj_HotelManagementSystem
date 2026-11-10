@@ -16,7 +16,7 @@ export class ApiError extends Error {
   }
 }
 
-type ApiErrorBody = { code?: string; message?: string; details?: Record<string, string> }
+type ApiErrorBody = { code?: string; error?: string; message?: string; details?: Record<string, string> }
 type RequestOptions = { method?: string; body?: unknown; token?: string; auth?: boolean; signal?: AbortSignal; responseType?: 'json' | 'blob' }
 const statusMessages: Record<number, string> = {
   400: 'Thông tin chưa hợp lệ. Vui lòng kiểm tra lại.',
@@ -65,7 +65,8 @@ export async function apiRequest<T>(
     throw new ApiError(
       response.status,
       message,
-      typeof error?.code === 'string' ? error.code : undefined,
+      typeof error?.code === 'string' ? error.code
+        : typeof error?.error === 'string' ? error.error : undefined,
       details,
     )
   }

@@ -24,7 +24,14 @@ export function BlockForm({ rooms, date, initialRoom, onClose, onSuccess }: {
       try { await createBlock(draft); notify('Đã chặn phòng.'); onSuccess(); onClose() }
       catch (e) {
         if (e instanceof ApiError && e.status === 403) navigate('/403', { replace: true })
-        else { setError(blockError(e)); if (e instanceof ApiError && e.status === 400) setErrors(e.details) }
+        else {
+          setError(blockError(e))
+          if (e instanceof ApiError && e.status === 400) {
+            // The room module's legacy validation response carries "field: message".
+            const field = /^(physicalRoomId|startAt|endAt|reason):\s*(.+)$/s.exec(e.message)
+            setErrors({ ...e.details, ...(field ? { [field[1]]: field[2] } : {}) })
+          }
+        }
       } finally { lock.current = false; setBusy(false) }
     }}>
       <p className="muted">Giờ Việt Nam (UTC+7). Máy chủ kiểm tra booking và các khoảng chặn trước khi lưu.</p>

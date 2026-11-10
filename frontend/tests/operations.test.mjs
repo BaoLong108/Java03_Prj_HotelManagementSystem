@@ -9,6 +9,18 @@ after(async () => { if (!output.startsWith(modules + sep)) throw new Error('Inva
 await build({ configFile: false, logLevel: 'silent', build: { ssr: 'tests/operations.entry.ts', outDir: output, rollupOptions: { output: { entryFileNames: 'entry.mjs' } } } })
 const api = await import(pathToFileURL(resolve(output, 'entry.mjs')).href)
 const valid = { physicalRoomId: '1', start: '2030-01-01T12:00', end: '2030-01-02T10:00', reason: 'Bảo trì' }
+
+test('room legacy error field preserves overlap code for the block form', async () => {
+  const original = globalThis.fetch
+  globalThis.fetch = async () => new Response(JSON.stringify({ error: 'BOOKING_OVERLAP', message: 'Phòng đã có booking hoặc hold còn hạn' }), { status: 409 })
+  try {
+    await assert.rejects(api.apiRequest('/api/v1/admin/room-blocks', { auth: false }), error => {
+      assert.equal(error.code, 'BOOKING_OVERLAP')
+      assert.equal(api.blockError(error), 'Phòng đã có booking hoặc giữ chỗ trong khoảng này')
+      return true
+    })
+  } finally { globalThis.fetch = original }
+})
 test('block validates dates, actual future boundary, room and nonblank reason in hotel time', () => {
   const now = Date.parse('2029-12-31T17:00:00Z')
   assert.deepEqual(api.validateBlock(valid, now), {})

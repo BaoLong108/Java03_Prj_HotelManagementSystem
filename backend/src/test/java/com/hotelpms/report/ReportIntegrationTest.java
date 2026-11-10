@@ -17,8 +17,9 @@ import org.springframework.test.context.support.AbstractTestExecutionListener;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+@ActiveProfiles("dev")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {"app.demo-seed.enabled=true", "app.demo-seed.password=ReportTest123!", "app.booking.scheduler.enabled=false"})
+        properties = {"app.demo-seed.enabled=true", "app.demo-seed.password=TestDemo123!", "app.booking.scheduler.enabled=false"})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @TestExecutionListeners(listeners = ReportIntegrationTest.Cleanup.class, mergeMode = TestExecutionListeners.MergeMode.MERGE_WITH_DEFAULTS)
 class ReportIntegrationTest {
@@ -53,7 +54,7 @@ class ReportIntegrationTest {
         assertThat(response.statusCode()).withFailMessage(response.body()).isBetween(200, 299);
         return json.readTree(response.body());
     }
-    String login(String role) throws Exception { return ok("POST", "/api/v1/auth/login", null, Map.of("email", role + "@hotel-pms.test", "password", "ReportTest123!")).path("accessToken").asText(); }
+    String login(String role) throws Exception { return ok("POST", "/api/v1/auth/login", null, Map.of("email", role + "@hotel-pms.test", "password", "TestDemo123!")).path("accessToken").asText(); }
 
     @Test void dailyUsesHotelDayHalfOpenBoundsFiltersAndMaskedContacts() throws Exception {
         String admin = login("admin"), staff = login("staff");
