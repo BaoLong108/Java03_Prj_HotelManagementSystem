@@ -26,6 +26,9 @@ public class DemoPaymentService {
   if(previous.isPresent())return PaymentResponse.from(previous.get(),booking);
   if(payments.existsByBookingIdAndStatus(booking.getId(),PaymentStatus.SUCCEEDED))
    throw new ApiException(HttpStatus.CONFLICT,"BOOKING_ALREADY_PAID","Booking đã được thanh toán");
+  if(payments.findFirstByBookingIdAndProviderAndStatusOrderByCreatedAtDescIdDesc(
+    booking.getId(),PaymentProvider.VNPAY,PaymentStatus.PENDING).isPresent())
+   throw new ApiException(HttpStatus.CONFLICT,"PAYMENT_IN_PROGRESS","Đang có lượt thanh toán VNPay. Vui lòng kiểm tra kết quả trước khi thanh toán tiếp.");
   Instant now=Instant.now();
   if(booking.getStatus()!=BookingStatus.PENDING_PAYMENT)
    throw new ApiException(HttpStatus.CONFLICT,"INVALID_BOOKING_STATUS","Booking không còn chờ thanh toán");

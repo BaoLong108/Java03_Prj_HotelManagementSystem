@@ -27,9 +27,9 @@ await build({ configFile: false, logLevel: 'silent', plugins: [{
 }], build: { ssr: 'tests/arrivals.entry.tsx', outDir: output, rollupOptions: {
   external: ['react', 'react-dom', 'react-router-dom', 'react/jsx-runtime'], output: { entryFileNames: 'entry.mjs' },
 } } })
-const { App, AnalyticsPage, analyticsApi, BookingTimelinePage, StaffCheckInPage, checkInApi, ToastProvider, auth } =
+const { App, AnalyticsPage, analyticsApi, BookingTimelinePage, StaffCheckInPage, checkInApi, ToastProvider, auth, RoomInventoryItem, adminRoomApi } =
   await import(pathToFileURL(resolve(output, 'entry.mjs')).href)
-const apis = [analyticsApi, checkInApi]
+const apis = [analyticsApi, checkInApi, adminRoomApi]
 const original = apis.map(api => ({ ...api }))
 after(async () => {
   if (!resolve(output).startsWith(modules + sep)) throw new Error('Unexpected test directory')
@@ -175,4 +175,31 @@ test('staff navigation shows check-in but denies admin-only analytics', async t 
   const view = await mount(t, App, '/admin/analytics', 'STAFF')
   assert.doesNotMatch(view.textContent, /Xuất CSV/)
   assert.match(view.textContent, /Không đủ quyền|không có quyền/i)
+})
+
+test('admin edits a room and confirms hiding through the existing API', async t => {
+  const calls = []
+  let changed = 0
+  const room = { id: 31, roomNumber: '301', roomTypeId: 2, roomTypeName: 'Deluxe', active: true, floorNumber: 3 }
+  adminRoomApi.update = async (...args) => { calls.push(['update', ...args]); return room }
+  adminRoomApi.hide = async id => { calls.push(['hide', id]) }
+  const view = await mount(t, () => h(RoomInventoryItem, { room, onChange: () => changed++ }), '/admin/rooms')
+  await click(button(view, 'Sửa phòng 301'))
+  await change(field(view.querySelector('dialog[open]'), 'Số phòng'), '301-A')
+  await click(button(view, 'Lưu thông tin phòng'))
+  assert.deepEqual(calls[0], ['update', 31, '301-A', 3])
+  await click(button(view, 'Ẩn phòng 301'))
+  assert.equal(calls.length, 1)
+  await click(button(view, 'Xác nhận ẩn phòng'))
+  assert.deepEqual(calls[1], ['hide', 31])
+  assert.equal(changed, 2)
+})
+
+test('a server conflict when hiding a booked room remains visible for the admin', async t => {
+  const room = { id: 31, roomNumber: '301', roomTypeId: 2, roomTypeName: 'Deluxe', active: true, floorNumber: 3 }
+  adminRoomApi.hide = async () => { throw new Error('Phòng đang có booking') }
+  const view = await mount(t, () => h(RoomInventoryItem, { room, onChange: () => assert.fail('Should not report success') }), '/admin/rooms')
+  await click(button(view, 'Ẩn phòng 301'))
+  await click(button(view, 'Xác nhận ẩn phòng'))
+  assert.match(view.querySelector('dialog[open]').textContent, /Phòng đang có booking/)
 })

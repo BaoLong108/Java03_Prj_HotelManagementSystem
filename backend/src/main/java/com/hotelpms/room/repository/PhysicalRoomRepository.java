@@ -8,6 +8,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface PhysicalRoomRepository extends JpaRepository<PhysicalRoom, Long> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT r FROM PhysicalRoom r WHERE r.id = :id")
+    Optional<PhysicalRoom> findByIdForUpdate(@Param("id") Long id);
 
     boolean existsByRoomNumberIgnoreCase(String roomNumber);
 

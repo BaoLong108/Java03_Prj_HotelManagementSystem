@@ -6,6 +6,7 @@ import { Alert, Badge, Button, Card, Field, LinkButton, LoadingState, PageHeader
 import { adminRoomApi } from './adminApi'
 import type { PhysicalRoom } from './adminApi'
 import type { RoomTypeResponse } from './api'
+import { RoomInventoryItem } from './RoomInventoryItem'
 import './rooms.css'
 
 function UploadPreview({ files, cover, onCover }: { files: File[]; cover: number; onCover: (index: number) => void }) {
@@ -123,7 +124,7 @@ export function AdminRoomsPage() {
         <p className="small muted">Giá và ảnh được dùng chung theo hạng phòng; khách chọn hạng phòng khi đặt.</p>
         {Boolean(selected?.images.length) && files.length > 0 && <label className="room-replace-confirm"><input type="checkbox" checked={replace} disabled={busy} onChange={(event) => setReplace(event.target.checked)} />Tôi xác nhận thay bộ ảnh hiện tại của hạng phòng này bằng các ảnh vừa chọn.</label>}
         <div className="button-row"><Button type="submit" busy={busy} disabled={!selected?.active || (!selected.images.length && files.length === 0)}>Tạo phòng & lưu ảnh</Button><Button variant="secondary" disabled={busy} onClick={() => { clearDraft(); setShowCreate(false); setError('') }}>Hủy tạo phòng</Button></div>
-      </form></>}</Card><Card><h2>Phòng thuộc hạng đã chọn</h2>{loadingRooms ? <LoadingState /> : rooms.length === 0 ? <p>Chưa có phòng vật lý thuộc hạng này.</p> : <div className="room-inventory-list">{rooms.map((room) => <div key={room.id}><strong>{room.roomNumber}</strong><span>{room.floorNumber ? `Tầng ${room.floorNumber}` : 'Chưa ghi tầng'}</span><Badge tone={room.active ? 'success' : 'neutral'}>{room.active ? 'Hoạt động' : 'Đã ẩn'}</Badge></div>)}</div>}</Card></div>}
+      </form></>}</Card><Card><h2>Phòng thuộc hạng đã chọn</h2>{loadingRooms ? <LoadingState /> : rooms.length === 0 ? <p>Chưa có phòng vật lý thuộc hạng này.</p> : <div className="room-inventory-list">{rooms.map((room) => <RoomInventoryItem key={room.id} room={room} onChange={() => setRefresh(value => value + 1)} />)}</div>}</Card></div>}
       {tab === 'types' && <div className="room-type-admin-list">{types.map((type) => <Card key={type.id}><h2>{type.name} <Badge>{type.code}</Badge></h2><p>{type.description}</p><p>Tối đa {type.maxOccupancy} khách · {type.activeRoomCount} phòng · {type.images.length} ảnh</p><PriceDisplay amount={type.basePricePerNight} suffix="/ đêm" /><LinkButton to={`/rooms/${type.id}`} variant="secondary">Xem chi tiết</LinkButton></Card>)}</div>}
       {tab === 'rates' && selected && <Card><h2>Giá cơ bản · {selected.name}</h2><form className="room-price-form" onSubmit={savePrice}><Field label="Giá mỗi đêm (VND)" type="number" min={0} max={9999999999999.99} step="0.01" required value={price} disabled={busy} onChange={(event) => setPrice(event.target.value)} /><p className="muted">Pricing sử dụng giá của hạng phòng, sau đó áp dụng ưu đãi thành viên và voucher. Booking đã tạo giữ nguyên giá đã chốt.</p><Button type="submit" busy={busy}>Lưu giá cơ bản</Button></form></Card>}
     </>}

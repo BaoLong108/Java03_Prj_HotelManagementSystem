@@ -5,4 +5,6 @@ export { BookingTimelinePage } from '../src/features/checkin/BookingTimelinePage
 export { checkInApi } from '../src/features/checkin/checkInApi'
 export { StaffCheckInPage } from '../src/features/checkin/StaffCheckInPage'
 export { ToastProvider } from '../src/shared/ui'
+export { RoomInventoryItem } from '../src/features/rooms/RoomInventoryItem'
+export { adminRoomApi } from '../src/features/rooms/adminApi'
 export * as auth from '../src/features/auth/AuthProvider'

@@ -143,7 +143,7 @@ public class RoomService {
 
     @Transactional
     public PhysicalRoomResponse updatePhysicalRoom(Long id, UpdatePhysicalRoomRequest req) {
-        PhysicalRoom room = physicalRooms.findById(id)
+        PhysicalRoom room = physicalRooms.findByIdForUpdate(id)
                 .orElseThrow(() -> new ApiException(
                         HttpStatus.NOT_FOUND, "PHYSICAL_ROOM_NOT_FOUND", "Phong khong ton tai"));
 
@@ -176,7 +176,7 @@ public class RoomService {
 
     @Transactional
     public void deactivatePhysicalRoom(Long id) {
-        PhysicalRoom room = physicalRooms.findById(id)
+        PhysicalRoom room = physicalRooms.findByIdForUpdate(id)
                 .orElseThrow(() -> new ApiException(
                         HttpStatus.NOT_FOUND, "PHYSICAL_ROOM_NOT_FOUND", "Phong khong ton tai"));
 

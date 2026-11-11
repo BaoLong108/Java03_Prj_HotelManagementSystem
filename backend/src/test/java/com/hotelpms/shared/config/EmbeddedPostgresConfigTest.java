@@ -17,7 +17,7 @@ class EmbeddedPostgresConfigTest {
                 assertThat(result.getString(1)).isEqualTo("hotel_pms");
             }
             var flyway = Flyway.configure().dataSource(datasource).load();
-            assertThat(flyway.migrate().migrationsExecuted).isEqualTo(6);
+            assertThat(flyway.migrate().migrationsExecuted).isEqualTo(7);
             flyway.validate();
         }
     }

@@ -21,6 +21,7 @@ import '../rooms/rooms.css'
 import { Alert, Badge, Button, Card, EmptyState, Field, LoadingState, PageHeader } from '../../shared/ui'
 import { Icon } from '../../shared/ui/Icon'
 import { VoucherInput } from './VoucherInput'
+import { VnpayPayment } from './VnpayPayment'
 
 type Step = 'SEARCH' | 'HOLD' | 'CONFIRMED'
 type ActiveTab = 'BOOKING' | 'MY_BOOKINGS'
@@ -759,6 +760,8 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
                     <Icon name="check" size={18} />
                     Thanh toán Demo ngay ({formatVnd(currentBooking.payableAmount)})
                   </Button>
+                  {currentBooking.payableAmount > 0 && <VnpayPayment bookingCode={currentBooking.bookingCode}
+                    disabled={busy || syncingHold || Boolean(holdSyncError) || currentBooking.status !== 'PENDING_PAYMENT'} />}
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Button

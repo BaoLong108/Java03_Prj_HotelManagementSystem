@@ -67,6 +67,8 @@ public class RoomAllocationService {
         for (Long roomId : candidateIds) {
             // Lock the candidate row for the duration of the current transaction
             lockPhysicalRoom(roomId);
+            if (!Boolean.TRUE.equals(jdbcTemplate.queryForObject(
+                    "SELECT is_active FROM physical_rooms WHERE id=?", Boolean.class, roomId))) continue;
             now = Instant.now();
             // Reclaim expired holds only while allocating a new booking, never while releasing a block.
             jdbcTemplate.update("UPDATE bookings SET status='EXPIRED',expired_at=?,updated_at=? WHERE physical_room_id=? AND status='PENDING_PAYMENT' AND hold_expires_at<=?",

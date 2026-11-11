@@ -13,6 +13,7 @@ const titles: Record<string, string> = {
   '/staff/rooms': 'Sơ đồ tầng', '/admin': 'Quản trị khách sạn', '/admin/rooms': 'Danh mục phòng', '/admin/rate-calendar': 'Lịch giá phòng',
   '/staff/check-in-requests': 'Yêu cầu nhận phòng', '/admin/analytics': 'Phân tích doanh thu',
   '/staff/room-blocks': 'Chặn và mở phòng',
+  '/admin/booking-export': 'Xuất lịch đặt phòng',
   '/admin/members': 'Thành viên & chính sách', '/admin/settings': 'Cài đặt', '/ui-kit': 'Thư viện giao diện', '/403': 'Không đủ quyền',
 }
 
@@ -91,6 +92,7 @@ const workspaceNav: NavItem[] = [
   { to: '/admin', label: 'Quản trị', icon: 'shield', admin: true }, { to: '/admin/rooms', label: 'Danh mục phòng', icon: 'building', admin: true },
   { to: '/admin/rate-calendar', label: 'Lịch giá phòng', icon: 'calendar', admin: true },
   { to: '/admin/analytics', label: 'Phân tích doanh thu', icon: 'chart', admin: true },
+  { to: '/admin/booking-export', label: 'Xuất lịch đặt phòng', icon: 'download', admin: true },
   { to: '/admin/members', label: 'Thành viên', icon: 'users', admin: true }, { to: '/admin/settings', label: 'Cài đặt', icon: 'settings', admin: true },
 ]
 

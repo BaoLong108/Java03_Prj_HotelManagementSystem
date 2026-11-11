@@ -18,6 +18,8 @@ import { AnalyticsPage } from './features/analytics/AnalyticsPage'
 import { BookingTimelinePage } from './features/checkin/BookingTimelinePage'
 import { StaffCheckInPage } from './features/checkin/StaffCheckInPage'
 import { StaffBookings } from './features/staff/bookings/DailyBookings'
+import { BookingExportPage } from './features/staff/bookings/BookingExportPage'
+import { PaymentReturnPage } from './features/booking/VnpayPayment'
 
 export default function App() {
   return <ToastProvider><AuthProvider><RouteEffects /><Routes><Route element={<AppLayout />}>
@@ -31,6 +33,7 @@ export default function App() {
     <Route element={<RequireAuth roles={['CUSTOMER']} />}>
       <Route path="my-bookings" element={<MyBookingsPage />} />
       <Route path="my-bookings/:bookingCode" element={<BookingTimelinePage />} />
+      <Route path="payment-return" element={<PaymentReturnPage />} />
     </Route>
     <Route path="ui-kit" element={<UiKitPage />} />
     <Route path="403" element={<ForbiddenPage />} />
@@ -51,6 +54,7 @@ export default function App() {
       <Route path="admin/rooms" element={<AdminRoomsPage />} />
       <Route path="admin/rate-calendar" element={<RateCalendarPage />} />
       <Route path="admin/analytics" element={<AnalyticsPage />} />
+      <Route path="admin/booking-export" element={<BookingExportPage />} />
       <Route path="admin/members" element={<AdminMembersPage />} />
       <Route path="admin/settings" element={<AdminSettingsPage />} />
     </Route>

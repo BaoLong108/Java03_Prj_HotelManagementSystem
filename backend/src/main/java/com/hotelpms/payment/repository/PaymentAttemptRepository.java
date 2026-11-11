@@ -85,6 +85,9 @@ public interface PaymentAttemptRepository extends JpaRepository<PaymentAttempt, 
 
     Optional<PaymentAttempt> findFirstByBookingIdOrderByCreatedAtDescIdDesc(Long bookingId);
 
+    Optional<PaymentAttempt> findFirstByBookingIdAndProviderAndStatusOrderByCreatedAtDescIdDesc(
+            Long bookingId, PaymentProvider provider, PaymentStatus status);
+
     /**
      * Tra cứu attempt theo mã giao dịch mà cổng thanh toán trả về.
      * Áp dụng cho cả hai cổng DEMO và VNPay — tên mã nội bộ của DEMO cũng
