@@ -24,7 +24,7 @@ await build({ configFile: false, logLevel: 'silent', plugins: [{
     if (!id.replaceAll('\\', '/').endsWith('/src/features/auth/AuthProvider.tsx')) return
     return 'let state; export const setTestAuth = value => { state = value }; export const useAuth = () => state; export const AuthProvider = ({children}) => children;'
   },
-}], build: { ssr: 'tests/operations.entry.tsx', outDir: output, rollupOptions: {
+}], build: { ssr: 'tests/floorRates.entry.tsx', outDir: output, rollupOptions: {
   external: ['react', 'react-dom', 'react-router-dom', 'react/jsx-runtime'], output: { entryFileNames: 'entry.mjs' },
 } } })
 const { App, FloorMapPage, RateCalendarPage, adminRoomApi, floorApi, rateApi, auth } = await import(pathToFileURL(resolve(output, 'entry.mjs')).href)
