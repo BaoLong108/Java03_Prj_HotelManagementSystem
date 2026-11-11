@@ -1,0 +1,11 @@
+.operations { display: grid; gap: 16px; min-width: 0; }
+.block-fields { border: 0; padding: 0; margin: 16px 0; display: grid; gap: 16px; min-width: 0; }
+.block-fields input, .block-fields select { min-width: 0; width: 100%; box-sizing: border-box; }
+.block-row { border-top: 1px solid var(--border); padding: 14px 0; overflow-wrap: anywhere; }
+.report-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin-bottom: 18px; }
+.report-controls .staff-control { min-width: 0; }
+.daily-bookings, .staff-bookings-tabs { min-width: 0; }
+.daily-bookings .table-scroll { max-width: 100%; overflow-x: auto; }
+.daily-bookings table { min-width: 1150px; }
+.field-error { color: #a02e2e; }
+@media(max-width: 600px) { .report-controls > label { width: 100%; } .report-controls input, .report-controls select { max-width: 100%; min-width: 0; } }

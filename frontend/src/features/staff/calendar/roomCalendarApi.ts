@@ -1,5 +1,5 @@
-// dev@b6bbe14: ADMIN reads types/physical rooms; STAFF/ADMIN reads blocks.
-// Booking calendar is still pending M2-06. Only this adapter needs replacing when it exists.
+// STAFF/ADMIN: GET /api/v1/staff/room-calendar returns physical rooms, bookings and blocks.
+// Explicit fixtures are used only when VITE_USE_FIXTURES is enabled.
 import { ApiError, apiRequest } from '../../../shared/api/client'
 import { USE_FIXTURES } from '../shared/fixtureMode'
 import { isBookingStatus } from '../shared/bookingStatus'

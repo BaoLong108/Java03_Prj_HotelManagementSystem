@@ -1,5 +1,5 @@
-// API THẬT – GET /api/v1/bookings/{bookingCode}: origin/PhanThanhBinh@4d64567; origin/BaoLong@2fca3e4 grants STAFF/ADMIN read access.
-// DTO ĐỀ XUẤT – chờ Thanh Binh (M3-03) chốt GET /api/v1/staff/bookings/search?phone= and masked contact/room metadata.
+// STAFF/ADMIN: GET /api/v1/staff/bookings/search?bookingCode= or ?phone=.
+// The server supplies masked contacts and room metadata; the detail parser remains for its existing tests.
 import { ApiError, apiRequest } from '../../../shared/api/client'
 import { USE_FIXTURES } from '../shared/fixtureMode'
 import { isBookingStatus } from '../shared/bookingStatus'

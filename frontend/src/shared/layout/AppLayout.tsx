@@ -12,6 +12,7 @@ const titles: Record<string, string> = {
   '/staff': 'Tổng quan vận hành', '/staff/bookings': 'Tra cứu booking', '/staff/calendar': 'Lịch phòng',
   '/staff/rooms': 'Sơ đồ tầng', '/admin': 'Quản trị khách sạn', '/admin/rooms': 'Danh mục phòng', '/admin/rate-calendar': 'Lịch giá phòng',
   '/staff/check-in-requests': 'Yêu cầu nhận phòng', '/admin/analytics': 'Phân tích doanh thu',
+  '/staff/room-blocks': 'Chặn và mở phòng',
   '/admin/members': 'Thành viên & chính sách', '/admin/settings': 'Cài đặt', '/ui-kit': 'Thư viện giao diện', '/403': 'Không đủ quyền',
 }
 
@@ -86,6 +87,7 @@ const workspaceNav: NavItem[] = [
   { to: '/staff', label: 'Tổng quan', icon: 'grid' }, { to: '/staff/bookings', label: 'Đặt phòng', icon: 'calendar' },
   { to: '/staff/calendar', label: 'Lịch phòng', icon: 'clock' }, { to: '/staff/rooms', label: 'Sơ đồ tầng', icon: 'bed' },
   { to: '/staff/check-in-requests', label: 'Yêu cầu nhận phòng', icon: 'key' },
+  { to: '/staff/room-blocks', label: 'Chặn và mở phòng', icon: 'settings' },
   { to: '/admin', label: 'Quản trị', icon: 'shield', admin: true }, { to: '/admin/rooms', label: 'Danh mục phòng', icon: 'building', admin: true },
   { to: '/admin/rate-calendar', label: 'Lịch giá phòng', icon: 'calendar', admin: true },
   { to: '/admin/analytics', label: 'Phân tích doanh thu', icon: 'chart', admin: true },
