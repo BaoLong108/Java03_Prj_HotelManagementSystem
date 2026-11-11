@@ -23,6 +23,9 @@ spring:
 server:
   port: ${PORT:8080}
 management:
+  health:
+    mail:
+      enabled: ${CONFIRMATION_MAIL_ENABLED:false}
   endpoints:
     web:
       exposure:
