@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { apiAssetUrl, errorMessage } from '../../shared/api/client'
 import { Alert, Badge, Button, Card, Field, LinkButton, LoadingState, PageHeader, PriceDisplay, Tabs } from '../../shared/ui'
 import { adminRoomApi } from './adminApi'
@@ -21,6 +22,8 @@ function UploadPreview({ files, cover, onCover }: { files: File[]; cover: number
 }
 
 export function AdminRoomsPage() {
+  const [params] = useSearchParams()
+  const requestedId = params.get('roomTypeId')
   const [tab, setTab] = useState<'physical' | 'types' | 'rates'>('physical')
   const [types, setTypes] = useState<RoomTypeResponse[]>([])
   const [typeId, setTypeId] = useState('')
@@ -47,11 +50,12 @@ export function AdminRoomsPage() {
     adminRoomApi.types(controller.signal).then((data) => {
       if (controller.signal.aborted) return
       setTypes(data)
-      setTypeId((current) => current || String(data.find((type) => type.active)?.id ?? ''))
+      setTypeId((current) => current || String((data.find(type => type.active && String(type.id) === requestedId)
+        ?? data.find(type => type.active))?.id ?? ''))
     }).catch((reason) => { if (!controller.signal.aborted) setError(errorMessage(reason)) })
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
-  }, [refresh])
+  }, [refresh, requestedId])
 
   useEffect(() => {
     if (!typeId) return
@@ -94,7 +98,8 @@ export function AdminRoomsPage() {
     catch (reason) { setError(errorMessage(reason)) } finally { setBusy(false) }
   }
 
-  return <><PageHeader eyebrow="ROOM INVENTORY" title="Danh mục phòng" description="Tạo phòng, quản lý ảnh dùng chung và giá cơ bản theo hạng phòng." />
+  return <><PageHeader eyebrow="ROOM INVENTORY" title="Danh mục phòng" description="Tạo phòng, quản lý ảnh dùng chung và giá cơ bản theo hạng phòng."
+    action={<LinkButton to={`/admin/rate-calendar${typeId ? `?roomTypeId=${typeId}` : ''}`} variant="secondary">Lịch giá phòng</LinkButton>} />
     {error && <Alert>{error}</Alert>}{notice && <Alert tone="success">{notice}</Alert>}
     <Tabs label="Danh mục quản lý" value={tab} onChange={setTab} items={[{ value: 'physical', label: 'Phòng vật lý' }, { value: 'types', label: 'Loại phòng' }, { value: 'rates', label: 'Giá cơ bản' }]} />
     {loading ? <LoadingState message="Đang tải hạng phòng…" /> : types.length === 0 ? <Card><p>Chưa có hạng phòng trong cơ sở dữ liệu.</p><Button onClick={() => setRefresh((value) => value + 1)}>Tải lại</Button></Card> : <>

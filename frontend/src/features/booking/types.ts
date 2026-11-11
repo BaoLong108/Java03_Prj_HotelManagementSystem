@@ -46,6 +46,7 @@ export type PriceQuote = {
   roomType: RoomType
   nights: number
   guestCount: number
+  basePricePerNight?: number
   baseAmount: number
   discountRate: number
   discountAmount: number

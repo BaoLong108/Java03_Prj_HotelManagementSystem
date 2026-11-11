@@ -1,4 +1,5 @@
 package com.hotelpms.booking.controller;
+import com.hotelpms.booking.dto.FloorOverview;
 import com.hotelpms.booking.service.StaffReadService;
 import java.time.Instant;
 import java.util.Map;
@@ -8,6 +9,9 @@ import org.springframework.web.bind.annotation.*;
 public class StaffReadController {
  private final StaffReadService reads;
  public StaffReadController(StaffReadService reads){this.reads=reads;}
+ @GetMapping("/floor-overview")
+ @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
+ public FloorOverview floorOverview() { return reads.floorOverview(Instant.now()); }
  @GetMapping("/room-calendar")
  public Map<String,Object> calendar(@RequestParam Instant from,@RequestParam Instant to,
    @RequestParam(required=false) Long roomTypeId){return reads.calendar(from,to,roomTypeId);}

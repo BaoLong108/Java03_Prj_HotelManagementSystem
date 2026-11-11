@@ -23,6 +23,8 @@ management:
       exposure:
         include: health
 app:
+  check-in:
+    days-before-arrival: ${CHECK_IN_DAYS_BEFORE_ARRIVAL:3}
   jwt:
     secret: ${JWT_SECRET:}
     issuer: hotel-pms-api

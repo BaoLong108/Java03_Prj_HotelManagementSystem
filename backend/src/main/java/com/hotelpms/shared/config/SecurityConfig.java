@@ -50,8 +50,16 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/bookings/{bookingCode}/voucher").hasRole("CUSTOMER")
                         .requestMatchers(HttpMethod.GET, "/api/v1/rooms", "/api/v1/rooms/availability", "/api/v1/rooms/{id}", "/api/v1/rooms/{typeId}/images/{imageId}").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/payments/demo").hasRole("CUSTOMER")
-                        .requestMatchers(HttpMethod.GET, "/api/v1/staff/room-calendar", "/api/v1/staff/bookings/search")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/staff/room-calendar", "/api/v1/staff/bookings/search", "/api/v1/staff/floor-overview")
                             .hasAnyRole("STAFF", "ADMIN")
+                        .requestMatchers("/api/v1/admin/rate-calendar", "/api/v1/admin/rate-calendar/**",
+                                "/api/v1/admin/rate-rules", "/api/v1/admin/rate-rules/**").hasRole("ADMIN")
+                        .requestMatchers("/api/v1/admin/analytics", "/api/v1/admin/analytics/**").hasRole("ADMIN")
+                        .requestMatchers("/api/v1/staff/check-in-requests", "/api/v1/staff/check-in-requests/**")
+                            .hasAnyRole("STAFF", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/bookings/{code}/timeline").hasRole("CUSTOMER")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/bookings/{code}/check-in-requests",
+                                "/api/v1/bookings/{code}/check-in-requests/{id}/cancel").hasRole("CUSTOMER")
                         .requestMatchers(HttpMethod.GET, "/api/v1/bookings/{bookingCode}/confirmation.pdf")
                             .hasAnyRole("CUSTOMER", "STAFF", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/pricing/quote").permitAll()

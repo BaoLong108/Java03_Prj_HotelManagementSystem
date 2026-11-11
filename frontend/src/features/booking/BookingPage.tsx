@@ -462,7 +462,7 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
                               </div>
                               <div className="room-card-price">
                                 <strong>{formatVnd(room.basePricePerNight)}</strong>
-                                <small>/ đêm</small>
+                                <small>Giá cơ bản / đêm</small>
                               </div>
                             </div>
 
@@ -524,11 +524,11 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
 
                       <div className="quote-row">
                         <span className="muted">Giá cơ sở</span>
-                        <span>{formatVnd(selectedRoom.basePricePerNight)} / đêm</span>
+                        <span>{formatVnd(quote.basePricePerNight ?? selectedRoom.basePricePerNight)} / đêm</span>
                       </div>
 
                       <div className="quote-row">
-                        <span className="muted">Tổng tiền phòng gốc</span>
+                        <span className="muted">Tổng tiền phòng theo từng đêm</span>
                         <strong>{quoteReady ? formatVnd(quote.baseAmount) : '—'}</strong>
                       </div>
 
@@ -961,6 +961,7 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
                         </td>
                         <td>
                           <div className="table-actions">
+                            <Link className="button button--ghost button--small" to={`/my-bookings/${encodeURIComponent(b.bookingCode)}`}>Chi tiết kỳ nghỉ</Link>
                             {isPending && (
                               <>
                                 <Button
@@ -984,7 +985,7 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
 
                             {b.status === 'CONFIRMED' && (
                               <Badge tone="success">
-                                <Icon name="check" size={14} /> Sẵn sàng nhận phòng
+                                <Icon name="check" size={14} /> Đã xác nhận
                               </Badge>
                             )}
 
