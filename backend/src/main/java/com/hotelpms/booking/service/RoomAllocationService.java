@@ -22,10 +22,18 @@ public class RoomAllocationService {
 
     private final JdbcTemplate jdbcTemplate;
     private final BookingRepository bookingRepository;
+    private final com.hotelpms.room.service.RoomAvailabilityService availability;
 
-    public RoomAllocationService(JdbcTemplate jdbcTemplate, BookingRepository bookingRepository) {
+    public RoomAllocationService(JdbcTemplate jdbcTemplate, BookingRepository bookingRepository,
+            com.hotelpms.room.service.RoomAvailabilityService availability) {
         this.jdbcTemplate = jdbcTemplate;
         this.bookingRepository = bookingRepository;
+        this.availability = availability;
+    }
+
+    public List<Long> findAvailableRoomTypeIds(Instant startAt, Instant endAt, Instant now) {
+        return availability.searchAt(startAt, endAt, 1, now).stream()
+                .map(com.hotelpms.room.service.RoomAvailabilityService.AvailableRoomType::id).toList();
     }
 
     @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)

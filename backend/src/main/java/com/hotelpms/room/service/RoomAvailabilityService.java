@@ -15,6 +15,10 @@ public class RoomAvailabilityService {
  public record AvailableRoomType(Long id,String code,String name,String description,int maxOccupancy,BigDecimal basePricePerNight,long availableRoomCount,String coverImageUrl) {}
  @Transactional(readOnly=true)
  public List<AvailableRoomType> search(Instant startAt,Instant endAt,int guestCount) {
+  return searchAt(startAt,endAt,guestCount,Instant.now());
+ }
+ @Transactional(readOnly=true)
+ public List<AvailableRoomType> searchAt(Instant startAt,Instant endAt,int guestCount,Instant now) {
   validate(startAt,endAt,guestCount);
   return jdbc.query("""
    SELECT t.id,t.code,t.name,t.description,t.max_occupancy,t.base_price_per_night,COUNT(r.id) available,
@@ -27,7 +31,7 @@ public class RoomAvailabilityService {
    GROUP BY t.id ORDER BY t.id
    """,(rs,n)->new AvailableRoomType(rs.getLong("id"),rs.getString("code"),rs.getString("name"),rs.getString("description"),
        rs.getInt("max_occupancy"),rs.getBigDecimal("base_price_per_night"),rs.getLong("available"),rs.getString("cover_url")),
-   guestCount,java.sql.Timestamp.from(endAt),java.sql.Timestamp.from(startAt),java.sql.Timestamp.from(Instant.now()),
+   guestCount,java.sql.Timestamp.from(endAt),java.sql.Timestamp.from(startAt),java.sql.Timestamp.from(now),
    java.sql.Timestamp.from(endAt),java.sql.Timestamp.from(startAt));
  }
  public static void validate(Instant start,Instant end,int guests) {

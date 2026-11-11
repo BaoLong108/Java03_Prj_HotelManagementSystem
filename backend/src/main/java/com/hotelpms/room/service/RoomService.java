@@ -21,11 +21,22 @@ public class RoomService {
     private final RoomTypeRepository roomTypes;
     private final PhysicalRoomRepository physicalRooms;
     private final RoomImageService images;
+    private final RoomAvailabilityService availability;
 
-    public RoomService(RoomTypeRepository roomTypes, PhysicalRoomRepository physicalRooms, RoomImageService images) {
+    public RoomService(RoomTypeRepository roomTypes, PhysicalRoomRepository physicalRooms, RoomImageService images,
+            RoomAvailabilityService availability) {
         this.roomTypes = roomTypes;
         this.physicalRooms = physicalRooms;
         this.images = images;
+        this.availability = availability;
+    }
+
+    @Transactional(readOnly = true)
+    public List<RoomTypeResponse> listAvailableRoomTypes(java.time.Instant startAt, java.time.Instant endAt,
+            int guests, java.time.Instant now) {
+        var available = availability.searchAt(startAt, endAt, guests, now).stream()
+                .map(RoomAvailabilityService.AvailableRoomType::id).collect(java.util.stream.Collectors.toSet());
+        return enrich(roomTypes.findAllActiveWithRoomCount().stream().filter(type -> available.contains(type.id())).toList());
     }
 
     // ── Public API ─────────────────────────────────────────────────────────────

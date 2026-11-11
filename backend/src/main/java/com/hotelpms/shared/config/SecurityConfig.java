@@ -68,6 +68,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/bookings/{bookingCode}/confirmation.pdf")
                             .hasAnyRole("CUSTOMER", "STAFF", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/pricing/quote").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/rooms/available").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/admin/room-blocks", "/api/v1/admin/room-blocks/{id}")
                             .hasAnyRole("STAFF", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/admin/room-blocks").hasAnyRole("STAFF", "ADMIN")
