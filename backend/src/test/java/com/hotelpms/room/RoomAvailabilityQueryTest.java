@@ -36,7 +36,6 @@ import tools.jackson.databind.ObjectMapper;
  * Owner: Le Phuoc Sang (PhuocSang).
  */
 @ActiveProfiles("dev")
-@org.springframework.transaction.annotation.Transactional
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @TestExecutionListeners(
@@ -107,6 +106,7 @@ class RoomAvailabilityQueryTest {
 
     // (a) Phong khong co booking/block -> available
     @Test
+    @org.springframework.transaction.annotation.Transactional
     void noBookingOrBlock_roomIsAvailable() {
         Instant s = f(5), e = f(7), now = Instant.now();
         assertThat(allocationService.findAvailableRoomTypeIds(s, e, now)).contains(RT_ID);
@@ -220,6 +220,7 @@ class RoomAvailabilityQueryTest {
 
     // (j) Sau khi lay phong + tao booking, khong con phong
     @Test
+    @org.springframework.transaction.annotation.Transactional
     void afterHoldCreated_roomUnavailable() {
         jdbc.update("UPDATE physical_rooms SET is_active=false WHERE id=?", PR_B);
         Instant s = f(65), e = f(67), now = Instant.now();

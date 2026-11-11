@@ -1,6 +1,6 @@
 # Hotel PMS Mini
 
-> Bản tích hợp Sprint 2 ngày 26/10 đã chạy Booking hold, Payment demo, RoomBlock/availability, Staff Calendar/Lookup và PDF với API/DB thật. Xem [task, contract và kết quả kiểm thử](docs/sprint2-completion.md) trước khi phát triển Sprint 3.
+> Bản tích hợp Sprint 3–4 bổ sung Loyalty/Voucher, Admin quản lý phòng và ảnh, lịch giá, Floor Map, báo cáo, Booking Timeline và yêu cầu nhận phòng online. Xem [phân công, tích hợp và hướng dẫn nghiệm thu](docs/sprint34-integration.md). VNPay và SMTP có cấu hình sandbox riêng.
 
 Monorepo cho đồ án quản lý một khách sạn. Nguyễn Ngọc Bảo Long phụ trách kỹ thuật và tích hợp. Kế hoạch chia 4 sprint, 5 thành viên; ưu tiên hoàn thành các việc P0 trước.
 
@@ -13,7 +13,9 @@ backend/                 Spring Boot API, Java 21, PostgreSQL, Flyway
     room/                RoomType, PhysicalRoom, RoomBlock, availability
     booking/             Booking, hold, trạng thái và job
     pricing/             Quote, giá và discount snapshot
-    payment/             Thanh toán demo, sau đó VNPay Sandbox
+    payment/             Thanh toán demo, VNPay Sandbox và email xác nhận
+    analytics/           Tổng hợp đặt phòng và thanh toán theo kỳ
+    report/              Danh sách theo ngày và CSV lịch đặt phòng
     loyalty/             Điểm và hạng khách hàng
     shared/              Cấu hình và thành phần dùng chung
   src/main/resources/db/migration/  Migration SQL theo thứ tự Flyway
@@ -24,7 +26,7 @@ docs/                    Quy ước kiến trúc, API, cộng tác
 compose.yaml             PostgreSQL + backend + frontend cho demo
 ```
 
-Backend đã có entity tài khoản, đăng ký/đăng nhập JWT và `/api/v1/auth/me`. Frontend có hai cổng responsive cho khách và Staff/Admin, trang chủ với ảnh concept, tìm phòng/quote thật, hold 15 phút, thanh toán demo, lịch sử booking, PDF và lịch/tra cứu Staff. Auth nối API thật, JWT và menu theo vai trò. Trang `/account` đọc điểm, chi tiêu hợp lệ, hạng và lịch sử tích điểm từ database. Booking đã thanh toán và hoàn tất được cộng điểm một lần, nâng hạng tự động; giữ nguyên giá snapshot cũ. Xem [hướng dẫn frontend](frontend/README.md), [nhật ký redesign](docs/frontend-redesign.md), [hợp đồng API Auth](docs/auth.md) và [bàn giao Sprint 3–4 của Long](docs/sprint34-long-handover.md). VNPay và báo cáo thuộc phần việc riêng của các thành viên.
+Backend có đăng ký/đăng nhập JWT và `/api/v1/auth/me`. Frontend có cổng khách và Staff/Admin, tìm phòng/quote thật, hold 15 phút, thanh toán demo, lịch sử booking và PDF. Trang `/account` đọc điểm, chi tiêu, hạng và lịch sử tích điểm từ database. Booking đã thanh toán và hoàn tất được cộng điểm một lần. Admin quản lý phòng/ảnh tại `/admin/rooms`, giá tại `/admin/rate-calendar`, báo cáo tại `/admin/analytics`, CSV lịch tại `/admin/booking-export`. Staff dùng lịch, tra cứu/theo ngày, `/staff/room-blocks`, `/staff/rooms` và `/staff/check-in-requests`. Customer mở chi tiết từ Kỳ nghỉ của tôi để xem Timeline và gửi giờ đến. Cấu hình VNPay/SMTP và giới hạn nghiệm thu có trong [bàn giao tích hợp](docs/sprint34-integration.md).
 
 ## Chạy cả hệ thống bằng một lệnh
 

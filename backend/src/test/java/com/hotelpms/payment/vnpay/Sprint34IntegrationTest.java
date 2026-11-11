@@ -56,6 +56,7 @@ class Sprint34IntegrationTest {
     @Autowired ObjectMapper json;
     @Autowired JwtService jwt;
     @Autowired UserRepository users;
+    @Autowired com.hotelpms.payment.repository.PaymentAttemptRepository attempts;
     @Autowired ConfirmationMailDelivery mailDelivery;
     @MockitoBean JavaMailSender sender;
     private Instant from, to;
@@ -186,6 +187,34 @@ class Sprint34IntegrationTest {
     }
 
     @Test
+    void paymentTimestampSurvivesPostgresRoundTripExactly() {
+        var payment = new com.hotelpms.payment.entity.PaymentAttempt(89001L,
+                com.hotelpms.payment.entity.PaymentProvider.DEMO, "precision-qa", new java.math.BigDecimal("2250000"));
+        payment.markSucceeded(Instant.parse("2032-01-01T12:00:00.123456789Z"));
+        assertThat(payment.getSucceededAt()).isEqualTo(Instant.parse("2032-01-01T12:00:00.123456Z"));
+        var saved = attempts.saveAndFlush(payment);
+        assertThat(attempts.findById(saved.getId()).orElseThrow().getSucceededAt()).isEqualTo(payment.getSucceededAt());
+    }
+
+    @Test
+    void memberPaymentContractUsesTheSameBookingAndIdempotencyAsTheUi() throws Exception {
+        var body = json.writeValueAsString(Map.of("bookingId", 89001, "idempotencyKey", "member-payment", "amount", 2250000));
+        mvc.perform(post("/api/v1/payments").header("Authorization", auth(OTHER)).contentType("application/json")
+                .content(body)).andExpect(status().isNotFound());
+        mvc.perform(post("/api/v1/payments").header("Authorization", auth(CUSTOMER)).contentType("application/json")
+                .content(body)).andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("SUCCEEDED"));
+        var replay = mvc.perform(post("/api/v1/payments").header("Authorization", auth(CUSTOMER)).contentType("application/json")
+                .content(body)).andExpect(status().isOk()).andReturn().getResponse();
+        long id = json.readTree(replay.getContentAsString()).get("id").asLong();
+        mvc.perform(get("/api/v1/payments/attempts/" + id).header("Authorization", auth(CUSTOMER)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.requestedAmount").value(2250000));
+        mvc.perform(get("/api/v1/payments/attempts/" + id).header("Authorization", auth(OTHER))).andExpect(status().isNotFound());
+        assertThat(jdbc.queryForObject("SELECT status FROM bookings WHERE id=89001", String.class)).isEqualTo("CONFIRMED");
+        mvc.perform(post("/api/v1/payments").header("Authorization", auth(CUSTOMER)).contentType("application/json")
+                .content(body.replace("2250000", "1"))).andExpect(status().isConflict());
+    }
+
+    @Test
     void adminExportHasBookingAndBlockAuditButDeniesStaffAndCustomer() throws Exception {
         jdbc.update("""
                 INSERT INTO room_blocks(physical_room_id,start_at,end_at,reason,created_by_user_id)
@@ -225,9 +254,7 @@ class Sprint34IntegrationTest {
         var booking = CompletableFuture.supplyAsync(() -> httpStatus(create));
         var hidden = CompletableFuture.supplyAsync(() -> httpStatus(hide));
         var results = List.of(booking.get(15, TimeUnit.SECONDS), hidden.get(15, TimeUnit.SECONDS));
-        assertThat(results).satisfiesAnyOf(
-                values -> assertThat(values).containsExactly(201, 409),
-                values -> assertThat(values).containsExactly(409, 204));
+        assertThat(results).isIn(List.of(201, 409), List.of(409, 204));
         boolean active = Boolean.TRUE.equals(jdbc.queryForObject("SELECT is_active FROM physical_rooms WHERE id=89001", Boolean.class));
         int holds = jdbc.queryForObject("SELECT count(*) FROM bookings WHERE physical_room_id=89001 AND status='PENDING_PAYMENT'", Integer.class);
         assertThat(active || holds == 0).isTrue();

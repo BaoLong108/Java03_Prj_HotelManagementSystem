@@ -185,7 +185,7 @@ public class PaymentAttempt extends AuditedEntity {
                     "Only PENDING payment attempt can be marked SUCCEEDED, current status: " + this.status);
         }
         this.status = PaymentStatus.SUCCEEDED;
-        this.succeededAt = now;
+        this.succeededAt = now.truncatedTo(java.time.temporal.ChronoUnit.MICROS);
     }
 
     /**

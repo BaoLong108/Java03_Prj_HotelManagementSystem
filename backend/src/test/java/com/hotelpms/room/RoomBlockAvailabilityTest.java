@@ -192,21 +192,14 @@ class RoomBlockAvailabilityTest {
         // Tao booking CONFIRMED tren phong C
         insertBooking(801L, PR_C, "BK-BLK-C", "CONFIRMED", s, e, now.minus(5, ChronoUnit.MINUTES));
 
-        // Tao block chong lan len booking CONFIRMED -> phai bi tu choi boi DB gist constraint
-        // hoac boi logic kiem tra cua service
         var req = new RoomBlockRequest(PR_C, s, e, "Conflict block");
-        // RoomBlockService kiem tra block-on-block overlap; DB gist bao ve booking-vs-block
-        // o tung booking rieng. Block co the duoc tao (do chua co check booking trong createBlock)
-        // nhung findAndLockAvailablePhysicalRoom se thay ca block lan booking deu chong lan.
-        // Dieu quan trong: phong khong con available.
-        try {
-            blockService.createBlock(req, STAFF);
-        } catch (ApiException ignored) {
-            // Neu service tu choi -> dung, phong van khong available
-        }
-        // Du co tao duoc block hay khong, phong khong con available (co booking CONFIRMED)
+        assertThatThrownBy(() -> blockService.createBlock(req, STAFF))
+                .isInstanceOf(ApiException.class)
+                .satisfies(error -> assertThat(((ApiException) error).getCode()).isEqualTo("BOOKING_OVERLAP"));
+        // Room C is reserved, while the same category still has free room D.
         List<Long> avail = allocationService.findAvailableRoomTypeIds(s, e, now);
-        assertThat(avail).doesNotContain(RT_ID);
+        assertThat(avail).contains(RT_ID);
+        assertThat(allocationService.findAndLockAvailablePhysicalRoom(RT_ID, s, e, now)).contains(PR_D);
         // -> Booking CONFIRMED khong bi anh huong boi block moi
         long bookingCount = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM bookings WHERE booking_code=? AND status='CONFIRMED'",

@@ -50,6 +50,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/bookings/{bookingCode}/voucher").hasRole("CUSTOMER")
                         .requestMatchers(HttpMethod.GET, "/api/v1/rooms", "/api/v1/rooms/availability", "/api/v1/rooms/{id}", "/api/v1/rooms/{typeId}/images/{imageId}").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/payments/demo").hasRole("CUSTOMER")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/payments").hasRole("CUSTOMER")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/payments/attempts/{id}").hasRole("CUSTOMER")
                         .requestMatchers(HttpMethod.GET, "/api/v1/payments/vnpay/ipn").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/payments/vnpay/availability").hasRole("CUSTOMER")
                         .requestMatchers(HttpMethod.POST, "/api/v1/payments/vnpay/checkout").hasRole("CUSTOMER")

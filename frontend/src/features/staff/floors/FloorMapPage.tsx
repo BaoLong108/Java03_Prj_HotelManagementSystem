@@ -98,6 +98,7 @@ export function FloorMapPage() {
         <section><h3>Phân phòng hiện tại</h3>{selected.assignment ? <><p>{selected.assignment.bookingCode} · {bookingStatusLabels[selected.assignment.status]}</p><p className="small muted">{formatHotelTime(selected.assignment.startAt)} → {formatHotelTime(selected.assignment.endAt)}</p></> : <p className="muted">Không có booking đang được gán trong khoảng này.</p>}</section>
         <div className="button-row">
           <LinkButton to={`/staff/calendar?from=${hotelDate(new Date(data?.asOf ?? Date.now()))}&roomTypeId=${selected.roomTypeId}`} variant="secondary">Xem lịch phòng</LinkButton>
+          <LinkButton to="/staff/room-blocks" variant="secondary">Chặn và mở phòng</LinkButton>
           {selected.assignment && <LinkButton to="/staff/bookings" variant="secondary">Tra cứu booking</LinkButton>}
           {user?.roles.includes('ADMIN') && <LinkButton to={`/admin/rooms?roomTypeId=${selected.roomTypeId}`} variant="secondary">Danh mục phòng</LinkButton>}
         </div>

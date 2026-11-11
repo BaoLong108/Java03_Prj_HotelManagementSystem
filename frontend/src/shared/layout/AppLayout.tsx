@@ -14,6 +14,7 @@ const titles: Record<string, string> = {
   '/staff/check-in-requests': 'Yêu cầu nhận phòng', '/admin/analytics': 'Phân tích doanh thu',
   '/staff/room-blocks': 'Chặn và mở phòng',
   '/admin/booking-export': 'Xuất lịch đặt phòng',
+  '/payment-return': 'Kết quả thanh toán',
   '/admin/members': 'Thành viên & chính sách', '/admin/settings': 'Cài đặt', '/ui-kit': 'Thư viện giao diện', '/403': 'Không đủ quyền',
 }
 
