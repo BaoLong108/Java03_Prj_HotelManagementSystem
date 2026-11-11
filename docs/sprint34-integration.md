@@ -46,4 +46,13 @@ Mặc định tắt. Bật bằng `CONFIRMATION_MAIL_ENABLED=true`, cấu hình 
 
 Worktree gốc BaoLong giữ nguyên toàn bộ file chưa commit và file cá nhân. Bản tích hợp nằm ở worktree riêng, đưa code local vào commit để review/CI trước khi cập nhật dev. Các bản ghi QA nằm trong PostgreSQL thử nghiệm riêng. Không sửa migration V1–V6 đã có. V7 thêm checkout và outbox.
 
-Kết quả chạy, commit dev và CI được cập nhật sau khi hoàn thành nghiệm thu.
+## Nghiệm thu ngày 12/11/2026
+
+- Backend: verify đầy đủ 341/341 tests qua, gồm lần chạy lại trên PostgreSQL dùng chung như CI sau khi sửa fixture availability. Hai lớp PaymentAttemptRepositoryTest và RoomAvailabilityQueryTest cũng có 39/39 tests qua khi chạy riêng cùng database. Fixture availability dùng namespace ID riêng, không sửa business logic để làm xanh test.
+- Frontend: 115/115 tests, lint và production build qua. Checkout VNPay tạo idempotency key theo phiên component để có thể thử lại sau một giao dịch thất bại; backend vẫn dùng lại checkout đang chờ và giữ các ràng buộc thanh toán.
+- Smoke API thật: SPA, health, đăng ký/đăng nhập, availability/quote, hold, thanh toán demo và replay toàn bộ response, booking của chủ tài khoản, điểm chưa cộng sớm, RBAC và PDF đều qua.
+- Smoke trình duyệt: booking BK261112-64E138 từ quote 5.000.000 ₫, hold có countdown đến hạn máy chủ, thanh toán demo CONFIRMED, lịch sử và timeline đúng dữ liệu. Customer vào trang xuất CSV bị chặn 403. Admin tải CSV thành công với kỳ đã thay đổi bằng bàn phím; giao diện 390px không tràn ngang. Các kiểm tra sửa/ẩn phòng, chặn/mở và audit đã thực hiện ở lượt QA trước trong cùng đợt tích hợp.
+- Docker Compose CI tại b00e7ea đã qua build/start PostgreSQL, API, frontend, kiểm tra health và smoke qua Nginx. Mỗi revision cuối vẫn phải có đủ backend/frontend/compose-demo xanh trước khi cập nhật dev. Kết quả chính thức và SHA dev được đối chiếu với GitHub Actions và remote khi bàn giao.
+- Không đưa database QA, ảnh QA cá nhân, logs, credentials hay file .env vào Git. 65 file code local trong manifest backup của worktree BaoLong giữ nguyên hash; việc tích hợp thực hiện ở worktree riêng.
+
+Chưa nghiệm thu bên ngoài: VNPay Sandbox merchant/IPN qua HTTPS và gửi/nhận email SMTP thực tế là **NOT VERIFIED** vì môi trường chưa có thông tin dịch vụ. Các test chữ ký, callback, outbox/retry và PDF kiểm tra logic nội bộ, không thay thế nghiệm thu dịch vụ ngoài. Không còn khoảng trống code bắt buộc nào khác được xác định trong WBS Sprint 3–4; trạng thái hoàn tất vận hành các tích hợp ngoài vẫn phụ thuộc cấu hình và chạy thử thực tế.

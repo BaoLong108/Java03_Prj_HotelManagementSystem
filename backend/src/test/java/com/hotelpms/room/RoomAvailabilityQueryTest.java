@@ -71,9 +71,10 @@ class RoomAvailabilityQueryTest {
         }
     }
 
-    private static final long RT_ID = 9001L;
-    private static final long PR_A  = 90011L;
-    private static final long PR_B  = 90012L;
+    // Separate from PaymentAttemptRepositoryTest and its generated physical rooms on the shared CI database.
+    private static final long RT_ID = 9_100_001L;
+    private static final long PR_A  = 9_100_011L;
+    private static final long PR_B  = 9_100_012L;
     private static final long STAFF_ID = 2L;
 
     @Value("${local.server.port}") private int port;
@@ -253,7 +254,7 @@ class RoomAvailabilityQueryTest {
             VALUES (?,?,3,?,?,1,?,?,?,?,
                     1000000.00,0.00,0.00,1000000.00)
             ON CONFLICT (id) DO NOTHING
-            """, id, code, RT_ID, physRoomId,
+            """, 9_100_100L + id, code, RT_ID, physRoomId,
              ts(s), ts(e), ts(holdExp), status);
     }
 
@@ -263,7 +264,7 @@ class RoomAvailabilityQueryTest {
               (id,physical_room_id,start_at,end_at,reason,created_by_user_id,created_at)
             VALUES (?,?,?,?,'Test block',?,NOW())
             ON CONFLICT (id) DO NOTHING
-            """, id, physRoomId, ts(s), ts(e), STAFF_ID);
+            """, 9_100_000L + id, physRoomId, ts(s), ts(e), STAFF_ID);
     }
 
     private void insertReleasedBlock(long id, long physRoomId, Instant s, Instant e, Instant rel) {
@@ -273,7 +274,7 @@ class RoomAvailabilityQueryTest {
                released_by_user_id,released_at)
             VALUES (?,?,?,?,'Released block',?,NOW(),?,?)
             ON CONFLICT (id) DO NOTHING
-            """, id, physRoomId, ts(s), ts(e), STAFF_ID, STAFF_ID, ts(rel));
+            """, 9_100_000L + id, physRoomId, ts(s), ts(e), STAFF_ID, STAFF_ID, ts(rel));
     }
 
     private java.sql.Timestamp ts(Instant i) { return java.sql.Timestamp.from(i); }

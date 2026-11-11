@@ -10,6 +10,7 @@ export function VnpayPayment({ bookingCode, disabled }: { bookingCode: string; d
   const [available, setAvailable] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [requestKey] = useState(() => `web-vnpay-${crypto.randomUUID()}`)
   useEffect(() => {
     const controller = new AbortController()
     apiRequest<{ available: boolean }>('/api/v1/payments/vnpay/availability', { signal: controller.signal })
@@ -23,7 +24,7 @@ export function VnpayPayment({ bookingCode, disabled }: { bookingCode: string; d
     setBusy(true); setError('')
     try {
       const result = await apiRequest<{ paymentUrl: string }>('/api/v1/payments/vnpay/checkout', {
-        method: 'POST', body: { bookingCode, idempotencyKey: `web-vnpay-${bookingCode}` },
+        method: 'POST', body: { bookingCode, idempotencyKey: requestKey },
       })
       const url = new URL(result.paymentUrl)
       if (url.origin !== 'https://sandbox.vnpayment.vn') throw new Error('URL VNPay Sandbox không hợp lệ.')
