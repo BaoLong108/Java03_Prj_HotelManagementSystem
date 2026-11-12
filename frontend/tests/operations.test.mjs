@@ -4,6 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { resolve, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { build } from 'vite'
+import { Blob } from 'node:buffer'
 const modules = resolve('node_modules'), output = await mkdtemp(resolve(modules, '.operations-'))
 after(async () => { if (!output.startsWith(modules + sep)) throw new Error('Invalid directory'); await rm(output, { recursive: true, force: true }) })
 await build({ configFile: false, logLevel: 'silent', build: { ssr: 'tests/operations.entry.ts', outDir: output, rollupOptions: { output: { entryFileNames: 'entry.mjs' } } } })

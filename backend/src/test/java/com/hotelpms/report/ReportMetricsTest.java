@@ -38,7 +38,7 @@ class ReportMetricsTest {
             assertThatThrownBy(() -> ReportFilters.period("2032-01-01", to)).hasMessageContaining("Bộ lọc");
     }
     @Test void csvQuotesUnicodeNewlinesAndNeutralizesSpreadsheetFormulaPrefixes() {
-        assertThat(ReportCsvService.cell("Phòng, \"đẹp\"\r\nDòng 2")).isEqualTo("\"Phòng, \"\"đẹp\"\"\r\nDòng 2\"");
+        assertThat(ReportCsvService.cell("Phòng, \"đẹp\"\r\nDòng 2")).isEqualTo("\"Phòng, \"\"đẹp\"\" ↵ Dòng 2\"");
         for (String dangerous : List.of("=1+1", "+cmd", "-1", "@SUM(A1)", " \t=1", "\r\n+1"))
             assertThat(ReportCsvService.cell(dangerous)).startsWith("\"'");
         assertThat(ReportCsvService.cell(null)).isEqualTo("\"\"");

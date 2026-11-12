@@ -21,6 +21,9 @@ public class ReportCsvService {
         String value = input == null ? "" : input;
         String leading = value.stripLeading();
         if (!leading.isEmpty() && "=+-@".indexOf(leading.charAt(0)) >= 0) value = "'" + value;
+        // Excel's legacy Text Import Wizard splits embedded newlines, even in quoted fields.
+        // Keep one record per row; the database/audit value is unchanged.
+        value = value.replaceAll("\\r\\n|\\r|\\n", " ↵ ");
         return "\"" + value.replace("\"", "\"\"") + "\"";
     }
     static void row(StringBuilder csv, String... values) {
