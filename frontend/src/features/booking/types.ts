@@ -14,6 +14,9 @@ export type BookingResponse = {
   discountRate: number
   discountAmount: number
   payableAmount: number
+  voucherCode?: string | null
+  voucherDiscountAmount?: number
+  afterMembershipAmount?: number
   createdAt: string
   confirmedAt?: string | null
   completedAt?: string | null
@@ -36,12 +39,14 @@ export type RoomType = {
   maxOccupancy: number
   basePricePerNight: number
   imageUrl?: string
+  coverImageUrl?: string | null
 }
 
 export type PriceQuote = {
   roomType: RoomType
   nights: number
   guestCount: number
+  basePricePerNight?: number
   baseAmount: number
   discountRate: number
   discountAmount: number

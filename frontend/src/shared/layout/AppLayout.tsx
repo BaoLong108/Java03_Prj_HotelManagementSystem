@@ -10,7 +10,11 @@ const titles: Record<string, string> = {
   '/': 'Một khoảng nghỉ, thật riêng', '/rooms': 'Phòng & không gian', '/booking': 'Đặt phòng', '/login': 'Đăng nhập',
   '/register': 'Tạo tài khoản', '/account': 'Tài khoản', '/my-bookings': 'Kỳ nghỉ của tôi',
   '/staff': 'Tổng quan vận hành', '/staff/bookings': 'Tra cứu booking', '/staff/calendar': 'Lịch phòng',
-  '/staff/rooms': 'Tình trạng phòng', '/admin': 'Quản trị khách sạn', '/admin/rooms': 'Danh mục phòng',
+  '/staff/rooms': 'Sơ đồ tầng', '/admin': 'Quản trị khách sạn', '/admin/rooms': 'Danh mục phòng', '/admin/rate-calendar': 'Lịch giá phòng',
+  '/staff/check-in-requests': 'Yêu cầu nhận phòng', '/admin/analytics': 'Phân tích doanh thu',
+  '/staff/room-blocks': 'Chặn và mở phòng',
+  '/admin/booking-export': 'Xuất lịch đặt phòng',
+  '/payment-return': 'Kết quả thanh toán',
   '/admin/members': 'Thành viên & chính sách', '/admin/settings': 'Cài đặt', '/ui-kit': 'Thư viện giao diện', '/403': 'Không đủ quyền',
 }
 
@@ -23,7 +27,9 @@ export function RouteEffects() {
   const location = useLocation()
   const previous = useRef(location.pathname)
   useEffect(() => {
-    document.title = `${titles[location.pathname] ?? (location.pathname.startsWith('/rooms/') ? 'Chi tiết loại phòng' : 'Không tìm thấy trang')} · Hotel PMS`
+    const title = titles[location.pathname] ?? (location.pathname.startsWith('/rooms/') ? 'Chi tiết loại phòng' :
+      location.pathname.startsWith('/my-bookings/') ? 'Chi tiết kỳ nghỉ' : 'Không tìm thấy trang')
+    document.title = `${title} · Hotel PMS`
     if (location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView()
     else window.scrollTo(0, 0)
     if (previous.current !== location.pathname) document.getElementById('main-content')?.focus({ preventScroll: true })
@@ -81,8 +87,13 @@ export function AppLayout() {
 type NavItem = { to: string; label: string; icon: IconName; admin?: boolean }
 const workspaceNav: NavItem[] = [
   { to: '/staff', label: 'Tổng quan', icon: 'grid' }, { to: '/staff/bookings', label: 'Đặt phòng', icon: 'calendar' },
-  { to: '/staff/calendar', label: 'Lịch phòng', icon: 'clock' }, { to: '/staff/rooms', label: 'Tình trạng phòng', icon: 'bed' },
+  { to: '/staff/calendar', label: 'Lịch phòng', icon: 'clock' }, { to: '/staff/rooms', label: 'Sơ đồ tầng', icon: 'bed' },
+  { to: '/staff/check-in-requests', label: 'Yêu cầu nhận phòng', icon: 'key' },
+  { to: '/staff/room-blocks', label: 'Chặn và mở phòng', icon: 'settings' },
   { to: '/admin', label: 'Quản trị', icon: 'shield', admin: true }, { to: '/admin/rooms', label: 'Danh mục phòng', icon: 'building', admin: true },
+  { to: '/admin/rate-calendar', label: 'Lịch giá phòng', icon: 'calendar', admin: true },
+  { to: '/admin/analytics', label: 'Phân tích doanh thu', icon: 'chart', admin: true },
+  { to: '/admin/booking-export', label: 'Xuất lịch đặt phòng', icon: 'download', admin: true },
   { to: '/admin/members', label: 'Thành viên', icon: 'users', admin: true }, { to: '/admin/settings', label: 'Cài đặt', icon: 'settings', admin: true },
 ]
 

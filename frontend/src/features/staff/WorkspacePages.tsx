@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Badge, Button, Card, DataTable, EmptyState, Field, LinkButton, PageHeader, Tabs } from '../../shared/ui'
+import { Badge, Button, Card, DataTable, EmptyState, Field, LinkButton, PageHeader } from '../../shared/ui'
 import { Icon } from '../../shared/ui/Icon'
 import { ReportDashboard } from './reports/ReportDashboard'
 import { BlockHistory } from './reports/BlockHistory'
@@ -25,7 +25,8 @@ export function StaffPage() {
     <div className="section-heading"><h2>Công việc thường dùng</h2></div><div className="quick-grid">{[
       { to: '/staff/bookings', title: 'Quản lý đặt phòng', description: 'Tra cứu và theo dõi kỳ nghỉ', icon: 'calendar' as const },
       { to: '/staff/calendar', title: 'Lịch phòng', description: 'Xem lịch theo ngày và tuần', icon: 'clock' as const },
-      { to: '/staff/rooms', title: 'Tình trạng phòng', description: 'Theo dõi phòng và lịch chặn', icon: 'bed' as const },
+      { to: '/staff/rooms', title: 'Sơ đồ tầng', description: 'Theo dõi phân phòng và lịch chặn', icon: 'bed' as const },
+      { to: '/staff/check-in-requests', title: 'Yêu cầu nhận phòng', description: 'Chuẩn bị đón khách theo giờ đến dự kiến', icon: 'key' as const },
     ].map((item) => <Link className="quick-card" to={item.to} key={item.to}><span className="small-icon"><Icon name={item.icon} /></span><div><h3>{item.title}</h3><p>{item.description}</p></div><Icon name="arrow" size={17} /></Link>)}</div>
   </>
 }
@@ -59,17 +60,14 @@ export function RoomOperationsPage() {
 export function AdminPage() {
   return <><PageHeader eyebrow="PROPERTY ADMINISTRATION" title="Quản trị khách sạn" description="Danh mục phòng, chính sách và cài đặt trong một không gian thống nhất." /><div className="admin-grid">{[
     { to: '/admin/rooms', icon: 'building' as const, title: 'Danh mục phòng', text: 'Loại phòng, phòng vật lý và giá cơ bản.' },
+    { to: '/admin/rate-calendar', icon: 'calendar' as const, title: 'Lịch giá phòng', text: 'Xem và cấu hình giá từng đêm theo loại phòng.' },
+    { to: '/admin/analytics', icon: 'chart' as const, title: 'Phân tích doanh thu', text: 'Đặt phòng, thanh toán demo và mức sử dụng phòng.' },
     { to: '/admin/members', icon: 'users' as const, title: 'Thành viên & chính sách', text: 'Quyền lợi theo hạng và nguyên tắc tích điểm.' },
     { to: '/admin/settings', icon: 'settings' as const, title: 'Cài đặt khách sạn', text: 'Tài khoản nhân viên và cấu hình vận hành.' },
   ].map((item) => <Link to={item.to} className="admin-card" key={item.to}><span className="small-icon"><Icon name={item.icon} size={26} /></span><h2>{item.title}</h2><p className="muted">{item.text}</p><span className="text-link">Mở khu vực <Icon name="arrow" size={17} /></span></Link>)}</div><ServiceStatus /></>
 }
 
-export function AdminRoomsPage() {
-  const [tab, setTab] = useState<'types' | 'physical' | 'rates'>('types')
-  return <><PageHeader eyebrow="ROOM INVENTORY" title="Danh mục phòng" description="Quản lý cấu trúc phòng và giá cơ bản của khách sạn." /><Tabs label="Danh mục quản lý" value={tab} onChange={setTab} items={[{ value: 'types', label: 'Loại phòng' }, { value: 'physical', label: 'Phòng vật lý' }, { value: 'rates', label: 'Giá cơ bản' }]} />
-    <Card className="table-card"><DataTable caption={tab === 'types' ? 'Loại phòng' : tab === 'physical' ? 'Phòng vật lý' : 'Giá cơ bản'} columns={tab === 'types' ? ['Mã loại phòng', 'Tên loại phòng', 'Sức chứa', 'Trạng thái'] : tab === 'physical' ? ['Số phòng', 'Loại phòng', 'Tầng', 'Trạng thái'] : ['Loại phòng', 'Giá cơ bản', 'Cập nhật gần nhất']}
-      empty={<EmptyState icon="building" title="Danh mục chưa sẵn sàng" description="Thông tin và thao tác thêm, sửa sẽ được mở khi dịch vụ danh mục được kết nối." />} /></Card></>
-}
+export { AdminRoomsPage } from '../rooms/AdminRoomsPage'
 
 export function AdminMembersPage() {
   return <><PageHeader eyebrow="MEMBERSHIP" title="Thành viên & chính sách" description="Chính sách thành viên đã thống nhất cho Hotel PMS Mini." /><MembershipBenefits compact /><p className="membership-note">1 điểm cho mỗi 10.000 ₫ thực trả hợp lệ sau giảm giá, loại khoản hoàn tiền. Chỉ ghi nhận một lần khi kỳ nghỉ đã thanh toán và COMPLETED.</p>

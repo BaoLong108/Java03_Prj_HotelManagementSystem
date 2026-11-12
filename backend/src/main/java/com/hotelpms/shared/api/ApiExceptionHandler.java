@@ -59,6 +59,11 @@ public class ApiExceptionHandler {
                     return ResponseEntity.status(HttpStatus.CONFLICT)
                             .body(new ApiError("ROOM_NOT_AVAILABLE", "Phòng đã có người đặt trong khoảng thời gian đã chọn"));
                 }
+                if (java.util.Set.of("uq_physical_rooms_number_normalized", "physical_rooms_room_number_key")
+                        .contains(constraint.getConstraintName() == null ? "" : constraint.getConstraintName())) {
+                    return ResponseEntity.status(HttpStatus.CONFLICT)
+                            .body(new ApiError("ROOM_NUMBER_DUPLICATE", "Số phòng đã tồn tại"));
+                }
             }
         }
         return ResponseEntity.status(HttpStatus.CONFLICT)
@@ -69,6 +74,17 @@ public class ApiExceptionHandler {
     ResponseEntity<ApiError> notFound() {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ApiError("NOT_FOUND", "Không tìm thấy tài nguyên"));
+    }
+
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    ResponseEntity<ApiError> uploadTooLarge() {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                .body(new ApiError("UPLOAD_TOO_LARGE", "Mỗi ảnh tối đa 5 MB; tổng yêu cầu tối đa 30 MB"));
+    }
+
+    @ExceptionHandler(org.springframework.web.multipart.support.MissingServletRequestPartException.class)
+    ResponseEntity<ApiError> missingUploadPart() {
+        return ResponseEntity.badRequest().body(new ApiError("INVALID_ROOM_IMAGES", "Thiếu thông tin phòng hoặc ảnh tải lên"));
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)

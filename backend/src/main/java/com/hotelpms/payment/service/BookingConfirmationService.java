@@ -28,7 +28,9 @@ public class BookingConfirmationService {
    "Booking: "+booking.bookingCode(),"Status: "+booking.status(),"Arrival: "+time.format(booking.startAt())+" (UTC+07)",
    "Departure: "+time.format(booking.endAt())+" (UTC+07)","Guests: "+booking.guestCount(),
    "Base amount: "+booking.baseAmount().toPlainString()+" VND",
-   "Discount: "+booking.discountAmount().toPlainString()+" VND",
+   "Membership discount: "+booking.discountAmount().toPlainString()+" VND",
+   "Voucher: "+(booking.voucherCode()==null?"None":booking.voucherCode()),
+   "Voucher discount: "+booking.voucherDiscountAmount().toPlainString()+" VND",
    "Payable: "+booking.payableAmount().toPlainString()+" VND",
    "Paid: "+payment.getRequestedAmount().toPlainString()+" VND",
    "Payment: "+payment.getProvider()+" #"+payment.getId(),"Paid at: "+time.format(payment.getSucceededAt())+" (UTC+07)");

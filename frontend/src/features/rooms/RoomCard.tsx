@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Badge, Button, Card, Dialog, LinkButton, PriceDisplay } from '../../shared/ui'
 import { Icon } from '../../shared/ui/Icon'
 
-// Presentation props only. Map the agreed API response here once the room service exists.
+// Presentation props: API metadata is mapped by the calling page.
 export type RoomPresentation = {
   id: number; name: string; description: string; maxOccupancy: number
   images: { src: string; alt: string }[]; amenities: string[]
@@ -10,14 +10,18 @@ export type RoomPresentation = {
 }
 
 export function ImageGallery({ images, name }: { images: RoomPresentation['images']; name: string }) {
-  const [selected, setSelected] = useState<number | null>(null)
-  const activeImage = selected === null ? undefined : images[selected]
+  const [selected, setSelected] = useState(0)
+  const [enlarged, setEnlarged] = useState(false)
+  const index = Math.min(selected, images.length - 1)
+  const activeImage = images[index]
   if (images.length === 0) return <div className="room-image-missing"><Icon name="bed" size={36} /><span>Chưa có ảnh phòng</span></div>
-  return <><div className="image-gallery">{images.map((image, index) => <button key={`${image.src}-${index}`} type="button" onClick={() => setSelected(index)} aria-label={`Xem ảnh ${index + 1}: ${name}`}><img src={image.src} alt={image.alt} loading="lazy" /></button>)}</div>
-    <Dialog open={Boolean(activeImage)} onClose={() => setSelected(null)} title={`${name} · ${(selected ?? 0) + 1}/${images.length}`}>
+  return <div className="room-gallery"><button className="gallery-main" type="button" aria-label={`Phóng to ảnh ${index + 1}: ${name}`} onClick={() => setEnlarged(true)}><img src={activeImage.src} alt={activeImage.alt} /><span>{index + 1}/{images.length} · Phóng to</span></button>
+    {images.length > 1 && <><div className="gallery-navigation"><Button variant="secondary" aria-label="Ảnh phòng trước" disabled={index === 0} onClick={() => setSelected(index - 1)}>Ảnh trước</Button><span aria-live="polite">Ảnh {index + 1}/{images.length}</span><Button variant="secondary" aria-label="Ảnh phòng tiếp theo" disabled={index === images.length - 1} onClick={() => setSelected(index + 1)}>Ảnh sau</Button></div>
+      <div className="image-gallery" aria-label={`Các ảnh ${name}`}>{images.map((image, imageIndex) => <button key={`${image.src}-${imageIndex}`} type="button" onClick={() => setSelected(imageIndex)} aria-pressed={index === imageIndex} aria-label={`Chọn ảnh ${imageIndex + 1}: ${name}`}><img src={image.src} alt={image.alt} loading="lazy" /></button>)}</div></>}
+    <Dialog open={enlarged} onClose={() => setEnlarged(false)} title={`${name} · ${index + 1}/${images.length}`}>
       {activeImage && <img className="gallery-large" src={activeImage.src} alt={activeImage.alt} />}
-      <div className="dialog-actions"><Button variant="secondary" disabled={selected === null || selected <= 0} onClick={() => setSelected((value) => Math.max(0, (value ?? 0) - 1))}>Ảnh trước</Button><Button variant="secondary" disabled={selected === null || selected >= images.length - 1} onClick={() => setSelected((value) => Math.min(images.length - 1, (value ?? 0) + 1))}>Ảnh sau</Button></div>
-    </Dialog></>
+      {images.length > 1 && <div className="dialog-actions"><Button variant="secondary" disabled={index <= 0} onClick={() => setSelected(index - 1)}>Ảnh trước</Button><Button variant="secondary" disabled={index >= images.length - 1} onClick={() => setSelected(index + 1)}>Ảnh sau</Button></div>}
+    </Dialog></div>
 }
 
 export function RoomCard({ room, search = '' }: { room: RoomPresentation; search?: string }) {

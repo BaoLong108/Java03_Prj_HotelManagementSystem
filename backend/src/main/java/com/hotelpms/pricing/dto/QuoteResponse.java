@@ -21,7 +21,7 @@ import java.math.BigDecimal;
  * @param roomTypeId         ID loại phòng đã báo giá
  * @param nights             Số đêm lưu trú = toLocalDate(endAt) - toLocalDate(startAt)
  * @param basePricePerNight  Giá cơ bản mỗi đêm từ bảng room_types
- * @param baseAmount         Tổng giá chưa giảm = basePricePerNight × nights
+ * @param baseAmount         Tổng giá từng đêm theo lịch, trước giảm giá
  * @param discountRate       Tỷ lệ giảm giá: 0.00 / 0.10 / 0.15 tương ứng STANDARD/VIP/DIAMOND
  * @param discountAmount     Số tiền được giảm = baseAmount × discountRate (HALF_UP, 2 decimal)
  * @param payableAmount      Số tiền phải trả = baseAmount - discountAmount

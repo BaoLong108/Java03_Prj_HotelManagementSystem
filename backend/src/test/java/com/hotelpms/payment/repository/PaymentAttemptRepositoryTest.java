@@ -257,9 +257,10 @@ class PaymentAttemptRepositoryTest {
     @DisplayName("Danh sách attempt của một booking, sắp xếp mới nhất trước")
     void findByBookingIdOrderByCreatedAtDesc() {
         Long bookingId = insertBooking("LIST-", new BigDecimal("300.00"));
-        attempts.saveAndFlush(newAttempt(bookingId, "idem-list-1"));
-        attempts.saveAndFlush(newAttempt(bookingId, "idem-list-2"));
-        attempts.saveAndFlush(newAttempt(bookingId, "idem-list-3"));
+        Instant firstCreatedAt = Instant.parse("2030-01-01T00:00:00Z");
+        for (int index = 1; index <= 3; index++) {
+            saveWithCreatedAt(newAttempt(bookingId, "idem-list-" + index), firstCreatedAt.plusSeconds(index));
+        }
 
         List<PaymentAttempt> list = attempts.findByBookingIdOrderByCreatedAtDesc(bookingId);
 
@@ -494,22 +495,24 @@ class PaymentAttemptRepositoryTest {
     @DisplayName("findFirstByBookingIdAndStatusOrderByCreatedAtDesc: trả attempt mới nhất")
     void findFirstByStatusReturnsMostRecent() {
         Long bookingId = insertBooking("FR-", new BigDecimal("100.00"));
-        attempts.saveAndFlush(new PaymentAttempt(
-                bookingId, PaymentProvider.DEMO, "idem-fr-1", new BigDecimal("100.00")));
-        // Cách nhau ít nhất 5ms để createdAt khác biệt.
-        try {
-            Thread.sleep(5);
-        } catch (InterruptedException ie) {
-            Thread.currentThread().interrupt();
-        }
-        attempts.saveAndFlush(new PaymentAttempt(
-                bookingId, PaymentProvider.DEMO, "idem-fr-2", new BigDecimal("100.00")));
+        Instant firstCreatedAt = Instant.parse("2030-01-01T00:00:00Z");
+        saveWithCreatedAt(new PaymentAttempt(
+                bookingId, PaymentProvider.DEMO, "idem-fr-1", new BigDecimal("100.00")), firstCreatedAt);
+        saveWithCreatedAt(new PaymentAttempt(
+                bookingId, PaymentProvider.DEMO, "idem-fr-2", new BigDecimal("100.00")), firstCreatedAt.plusSeconds(1));
 
         Optional<PaymentAttempt> first = attempts.findFirstByBookingIdAndStatusOrderByCreatedAtDesc(
                 bookingId, PaymentStatus.PENDING);
 
         assertThat(first).isPresent();
         assertThat(first.get().getIdempotencyKey()).isEqualTo("idem-fr-2");
+    }
+
+    /** Ordering fixtures use distinct instants instead of depending on OS clock resolution or sleeps. */
+    private void saveWithCreatedAt(PaymentAttempt attempt, Instant createdAt) {
+        PaymentAttempt saved = attempts.saveAndFlush(attempt);
+        jdbc.update("UPDATE payment_attempts SET created_at = ? WHERE id = ?",
+                java.sql.Timestamp.from(createdAt), saved.getId());
     }
 
     @Test

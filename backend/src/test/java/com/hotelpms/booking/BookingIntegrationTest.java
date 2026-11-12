@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -99,8 +100,14 @@ class BookingIntegrationTest {
     private Long physicalRoomId101;
     private Long physicalRoomId102;
 
+    @AfterEach
+    void cleanLoyaltyLedger() {
+        jdbc.update("DELETE FROM loyalty_awards");
+    }
+
     @BeforeEach
     void setUp() {
+        jdbc.update("DELETE FROM loyalty_awards");
         jdbc.update("DELETE FROM payment_attempts");
         bookingRepository.deleteAll();
 

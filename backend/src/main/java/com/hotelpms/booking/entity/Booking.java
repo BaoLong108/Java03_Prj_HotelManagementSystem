@@ -61,6 +61,12 @@ public class Booking extends AuditedEntity {
     @Column(name = "payable_amount", nullable = false, precision = 15, scale = 2)
     private BigDecimal payableAmount;
 
+    @Column(name = "voucher_code", length = 6)
+    private String voucherCode;
+
+    @Column(name = "voucher_discount_amount", nullable = false, precision = 15, scale = 2)
+    private BigDecimal voucherDiscountAmount = BigDecimal.ZERO;
+
     @Column(name = "confirmed_at")
     private Instant confirmedAt;
 
@@ -106,6 +112,24 @@ public class Booking extends AuditedEntity {
     }
 
     // State transition methods
+
+    public void applyVoucher(String code, BigDecimal faceAmount) {
+        if (status != BookingStatus.PENDING_PAYMENT) throw new IllegalStateException("Booking is no longer pending");
+        voucherCode = Objects.requireNonNull(code);
+        voucherDiscountAmount = getAfterMembershipAmount().min(faceAmount);
+        payableAmount = getAfterMembershipAmount().subtract(voucherDiscountAmount);
+    }
+
+    public void removeVoucher() {
+        if (status != BookingStatus.PENDING_PAYMENT) throw new IllegalStateException("Booking is no longer pending");
+        voucherCode = null;
+        voucherDiscountAmount = BigDecimal.ZERO;
+        payableAmount = getAfterMembershipAmount();
+    }
+
+    public String getVoucherCode() { return voucherCode; }
+    public BigDecimal getVoucherDiscountAmount() { return voucherDiscountAmount; }
+    public BigDecimal getAfterMembershipAmount() { return baseAmount.subtract(discountAmount); }
 
     public void confirm(Instant now) {
         if (this.status != BookingStatus.PENDING_PAYMENT) {

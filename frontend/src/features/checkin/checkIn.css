@@ -1,0 +1,38 @@
+.journey-page { width: min(calc(100% - 2rem), 72rem); margin: 2rem auto 4rem; }
+.journey-page, .checkin-workspace, .journey-grid { display: grid; gap: 1rem; min-width: 0; }
+.journey-summary { display: grid; grid-template-columns: minmax(10rem, 1fr) minmax(12rem, 1.2fr) minmax(12rem, 1fr); gap: 1rem; }
+.journey-cover { display: block; width: 100%; height: 100%; min-height: 11rem; max-height: 19rem; object-fit: cover; border-radius: .8rem; }
+.journey-cover--empty { display: grid; place-items: center; background: #edf3ef; color: #26645d; }
+.journey-summary .card-heading { flex-wrap: wrap; }
+.journey-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+.journey-grid h2 { font-size: 1.2rem; }
+.journey-timeline { margin: 1.1rem 0; padding: 0; list-style: none; }
+.journey-timeline li { position: relative; display: grid; grid-template-columns: 1.8rem minmax(0, 1fr); gap: .75rem; padding-bottom: 1rem; }
+.journey-timeline li:not(:last-child)::before { content: ''; position: absolute; inset: 1.5rem auto 0 .85rem; width: 2px; background: #e0e8e2; }
+.journey-marker { width: 1.75rem; height: 1.75rem; border-radius: 50%; display: grid; place-items: center; background: #e7f1eb; color: #206052; }
+.journey-timeline time { display: block; font-size: .85rem; color: #586662; }
+.journey-request { padding: .75rem; border: 1px solid #dae5df; border-radius: .7rem; margin-bottom: .75rem; }
+.journey-request > div { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.journey-note { white-space: pre-wrap; overflow-wrap: anywhere; background: #f0f5f1; padding: .65rem; border-radius: .5rem; }
+.checkin-form { display: grid; gap: .75rem; }
+.checkin-form > .button { justify-self: start; }
+.checkin-form textarea { box-sizing: border-box; width: 100%; resize: vertical; font: inherit; padding: .65rem; border: 1px solid #b6c4bd; border-radius: .5rem; }
+.checkin-checkbox { display: flex; gap: .55rem; align-items: center; }
+.checkin-search form { display: flex; align-items: end; flex-wrap: wrap; gap: .8rem; }
+.checkin-search .field { flex: 1 1 13rem; min-width: 0; }
+.checkin-queue { display: grid; gap: .7rem; padding: 0; list-style: none; margin: 0; }
+.checkin-queue-item { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; align-items: center; gap: .7rem; }
+.checkin-queue-item h2 { font-size: 1.1rem; }
+.checkin-queue-item p, .checkin-queue-item h2 { margin: 0; overflow-wrap: anywhere; }
+.dialog.checkin-drawer { margin: 0 0 0 auto; width: min(100%, 34rem); height: 100%; max-height: 100%; border-radius: 0; }
+.checkin-drawer-status { display: flex; flex-wrap: wrap; gap: .5rem; }
+.checkin-drawer .details-list dd { max-width: 65%; overflow-wrap: anywhere; text-align: end; }
+@media (max-width: 880px) {
+  .journey-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .journey-prices { grid-column: 1 / -1; }
+}
+@media (max-width: 620px) {
+  .journey-grid, .journey-summary { grid-template-columns: minmax(0, 1fr); }
+  .journey-cover { height: 12rem; }
+  .checkin-queue-item { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

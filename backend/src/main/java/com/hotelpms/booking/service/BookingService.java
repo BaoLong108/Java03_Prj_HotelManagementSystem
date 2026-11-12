@@ -32,13 +32,17 @@ public class BookingService {
     private final BookingLifecycleTransitions lifecycle;
     private final com.hotelpms.pricing.service.QuoteService quotes;
     private final com.hotelpms.payment.repository.PaymentAttemptRepository payments;
+    private final com.hotelpms.loyalty.LoyaltyAwardService loyalty;
+    private final com.hotelpms.loyalty.VoucherService vouchers;
 
     public BookingService(
             BookingRepository bookingRepository,
             CustomerProfileRepository customerProfileRepository,
             RoomAllocationService roomAllocationService,
             com.hotelpms.pricing.service.QuoteService quotes,
-            com.hotelpms.payment.repository.PaymentAttemptRepository payments, BookingLifecycleTransitions lifecycle
+            com.hotelpms.payment.repository.PaymentAttemptRepository payments, BookingLifecycleTransitions lifecycle,
+            com.hotelpms.loyalty.LoyaltyAwardService loyalty,
+            com.hotelpms.loyalty.VoucherService vouchers
     ) {
         this.bookingRepository = bookingRepository;
         this.customerProfileRepository = customerProfileRepository;
@@ -46,6 +50,8 @@ public class BookingService {
         this.quotes = quotes;
         this.payments = payments;
         this.lifecycle = lifecycle;
+        this.loyalty = loyalty;
+        this.vouchers = vouchers;
     }
 
     @Transactional
@@ -172,6 +178,7 @@ public class BookingService {
         if (booking.getStatus() != BookingStatus.PENDING_PAYMENT)
             throw new ApiException(HttpStatus.CONFLICT, "INVALID_BOOKING_STATUS", "Chỉ hủy booking chưa thanh toán");
         booking.cancel(Instant.now());
+        vouchers.releaseForBooking(booking.getId());
         Booking saved = bookingRepository.save(booking);
         return BookingResponse.from(saved);
     }
@@ -194,6 +201,7 @@ public class BookingService {
             if (booking.getStatus() == BookingStatus.PENDING_PAYMENT) {
                 booking.expire(now);
                 bookingRepository.save(booking);
+                vouchers.releaseForBooking(booking.getId());
             }
             throw new ApiException(HttpStatus.CONFLICT, "BOOKING_EXPIRED", "Thời hạn giữ phòng 15 phút đã hết hạn");
         }
@@ -226,6 +234,7 @@ public class BookingService {
             throw new ApiException(HttpStatus.CONFLICT, "STAY_NOT_FINISHED", "Chưa kết thúc kỳ nghỉ");
         booking.complete(Instant.now());
         Booking saved = bookingRepository.save(booking);
+        loyalty.awardCompletedBooking(saved.getId(), Instant.now());
         return BookingResponse.from(saved);
     }
 

@@ -1,6 +1,15 @@
 spring:
+  mail:
+    properties:
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
   application:
     name: hotel-pms-api
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 30MB
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/hotel_pms}
     username: ${DB_USER:hotel_pms}
@@ -14,11 +23,25 @@ spring:
 server:
   port: ${PORT:8080}
 management:
+  health:
+    mail:
+      enabled: ${CONFIRMATION_MAIL_ENABLED:false}
   endpoints:
     web:
       exposure:
         include: health
 app:
+  confirmation-mail:
+    enabled: ${CONFIRMATION_MAIL_ENABLED:false}
+    from: ${CONFIRMATION_MAIL_FROM:hotel-pms@example.test}
+  vnpay:
+    enabled: ${VNPAY_ENABLED:false}
+    tmn-code: ${VNPAY_TMN_CODE:}
+    hash-secret: ${VNPAY_HASH_SECRET:}
+    payment-url: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
+    return-url: ${VNPAY_RETURN_URL:http://localhost:5173/payment-return}
+  check-in:
+    days-before-arrival: ${CHECK_IN_DAYS_BEFORE_ARRIVAL:3}
   jwt:
     secret: ${JWT_SECRET:}
     issuer: hotel-pms-api

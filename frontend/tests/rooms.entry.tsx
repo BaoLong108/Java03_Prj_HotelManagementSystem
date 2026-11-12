@@ -1,0 +1,5 @@
+export { AdminRoomsPage } from '../src/features/rooms/AdminRoomsPage'
+export { RoomDetailPage } from '../src/features/rooms/RoomsPage'
+export { roomApi } from '../src/features/rooms/api'
+export { adminRoomApi } from '../src/features/rooms/adminApi'
+export { apiRequest } from '../src/shared/api/client'

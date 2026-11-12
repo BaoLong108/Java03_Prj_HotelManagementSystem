@@ -53,11 +53,11 @@ GET /api/v1/pricing/quote
 {
   "roomTypeId": 1,
   "nights": 2,
-  "basePricePerNight": "1000000.00",
-  "baseAmount": "2000000.00",
-  "discountRate": "0.1000",
-  "discountAmount": "200000.00",
-  "payableAmount": "1800000.00",
+  "basePricePerNight": 1000000.00,
+  "baseAmount": 2000000.00,
+  "discountRate": 0.1000,
+  "discountAmount": 200000.00,
+  "payableAmount": 1800000.00,
   "appliedTier": "VIP"
 }
 ```
@@ -66,26 +66,28 @@ GET /api/v1/pricing/quote
 | --- | --- | --- |
 | `roomTypeId` | number (`Long`) | ID đã báo giá, lặp lại từ input. |
 | `nights` | integer | Số đêm lưu trú, ≥ 1. |
-| `basePricePerNight` | string số (`BigDecimal`, scale 2) | Giá gốc 1 đêm từ `room_types.base_price_per_night`. |
-| `baseAmount` | string số (`BigDecimal`, scale 2) | `basePricePerNight × nights`. |
-| `discountRate` | string số (`BigDecimal`, scale 4) | `0.0000` / `0.1000` / `0.1500`. |
-| `discountAmount` | string số (`BigDecimal`, scale 2) | `baseAmount × discountRate`, làm tròn HALF_UP. |
-| `payableAmount` | string số (`BigDecimal`, scale 2) | `baseAmount - discountAmount`. |
+| `basePricePerNight` | number (`BigDecimal`, scale 2) | Giá gốc 1 đêm từ `room_types.base_price_per_night`. |
+| `baseAmount` | number (`BigDecimal`, scale 2) | Tổng giá hiệu lực của các đêm trong khoảng nhận đến trước ngày trả. |
+| `discountRate` | number (`BigDecimal`, scale 4) | `0.0000` / `0.1000` / `0.1500`. |
+| `discountAmount` | number (`BigDecimal`, scale 2) | `baseAmount × discountRate`, làm tròn HALF_UP. |
+| `payableAmount` | number (`BigDecimal`, scale 2) | `baseAmount - discountAmount`. |
 | `appliedTier` | string enum | `"STANDARD"` / `"VIP"` / `"DIAMOND"`. |
 
-> Tất cả tiền dùng `BigDecimal` ở backend và trả về dạng **chuỗi số** để tránh mất chính xác
-> khi frontend parse sang `number`. Tên trường (`baseAmount`, `discountRate`, `payableAmount`)
-> khớp với cột trong `bookings` và constraint `ck_bookings_amounts` của V1.
+> Backend tính tiền bằng `BigDecimal` và trả các trường trên dưới dạng số JSON. Frontend hiển thị số tiền từ báo giá. Backend tính và lưu giá snapshot khi tạo booking.
 
 ## 4. Công thức tính giá (VND)
 
 ```
 nights           = toLocalDate(endAt) − toLocalDate(startAt)        // ChronoUnit.DAYS
-baseAmount       = basePricePerNight × nights                       // scale 2, HALF_UP
+baseAmount       = sum(effectiveRate(night))                        // scale 2, HALF_UP
 discountRate     = lookup(tier)                                     // 0.0000 / 0.1000 / 0.1500, scale 4
 discountAmount   = baseAmount × discountRate                        // scale 2, HALF_UP
 payableAmount    = baseAmount − discountAmount                      // scale 2, HALF_UP
 ```
+
+Mỗi đêm lấy ngày tại `Asia/Ho_Chi_Minh`. Giá hiệu lực lấy theo thứ tự giá chỉ định, ngày lễ, theo mùa, cuối tuần, rồi giá cơ bản. Cuối tuần gồm thứ Bảy và Chủ nhật. Mỗi quy tắc đặt một giá tuyệt đối cho một loại phòng trong khoảng tối đa 366 đêm, tính cả hai đầu. PostgreSQL chặn quy tắc cùng loại đang hoạt động chồng ngày. Lịch giá và preview dùng cùng thứ tự với quote. `basePricePerNight` vẫn là giá cơ bản của RoomType. Xem [OpenAPI vận hành](../operations-openapi.yaml).
+
+Công thức này áp dụng cho **Quote trước mã**. Sau khi tạo hold, Customer có thể [áp mã đổi điểm](../loyalty-vouchers.md) ở checkout; Booking lúc đó có `voucherDiscountAmount`, `afterMembershipAmount` và `payableAmount` cuối sau mã. Payment đọc số cuối từ Booking, không dùng lại Quote hoặc tính lại tier để thu tiền.
 
 Bảng hạng (tham khảo `pricing-rules.md`):
 
@@ -164,11 +166,11 @@ Response 200:
 {
   "roomTypeId": 1,
   "nights": 2,
-  "basePricePerNight": "1000000.00",
-  "baseAmount": "2000000.00",
-  "discountRate": "0.0000",
-  "discountAmount": "0.00",
-  "payableAmount": "2000000.00",
+  "basePricePerNight": 1000000.00,
+  "baseAmount": 2000000.00,
+  "discountRate": 0.0000,
+  "discountAmount": 0.00,
+  "payableAmount": 2000000.00,
   "appliedTier": "STANDARD"
 }
 ```
@@ -181,11 +183,11 @@ Response 200:
 {
   "roomTypeId": 1,
   "nights": 3,
-  "basePricePerNight": "1000000.00",
-  "baseAmount": "3000000.00",
-  "discountRate": "0.1000",
-  "discountAmount": "300000.00",
-  "payableAmount": "2700000.00",
+  "basePricePerNight": 1000000.00,
+  "baseAmount": 3000000.00,
+  "discountRate": 0.1000,
+  "discountAmount": 300000.00,
+  "payableAmount": 2700000.00,
   "appliedTier": "VIP"
 }
 ```

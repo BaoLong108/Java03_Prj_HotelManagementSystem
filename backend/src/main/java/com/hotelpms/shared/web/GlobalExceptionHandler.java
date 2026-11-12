@@ -69,11 +69,6 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.of(400, "VALIDATION_ERROR", message));
     }
 
-    /** Catch-all — 500. */
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleGeneric(Exception ex) {
-        return ResponseEntity
-                .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ErrorResponse.of(500, "INTERNAL_ERROR", "Lỗi hệ thống, vui lòng thử lại"));
-    }
+    // Other exceptions fall through to ApiExceptionHandler, including upload limits
+    // and database uniqueness conflicts (which must remain 413/409 rather than 500).
 }

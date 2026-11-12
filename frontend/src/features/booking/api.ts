@@ -5,6 +5,8 @@ const params = (body: CreateBookingRequest) => new URLSearchParams({
   roomTypeId: String(body.roomTypeId), startAt: body.startAt, endAt: body.endAt, guestCount: String(body.guestCount),
 })
 export const bookingApi = {
+  applyVoucher: (code: string, voucherCode: string, signal?: AbortSignal) => apiRequest<BookingResponse>(`/api/v1/bookings/${encodeURIComponent(code)}/voucher`, { method: 'POST', body: { code: voucherCode }, signal }),
+  removeVoucher: (code: string, signal?: AbortSignal) => apiRequest<BookingResponse>(`/api/v1/bookings/${encodeURIComponent(code)}/voucher`, { method: 'DELETE', signal }),
   downloadConfirmation: async (code: string) => {
     const blob = await apiRequest<Blob>(`/api/v1/bookings/${encodeURIComponent(code)}/confirmation.pdf`, { responseType: 'blob' })
     const url = URL.createObjectURL(blob)

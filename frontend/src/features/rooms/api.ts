@@ -1,5 +1,6 @@
 import { apiRequest } from '../../shared/api/client'
 
+export type RoomImage = { id: number; url: string; cover: boolean; sortOrder: number; width: number; height: number }
 export type RoomTypeResponse = {
   id: number
   code: string
@@ -8,6 +9,9 @@ export type RoomTypeResponse = {
   maxOccupancy: number
   basePricePerNight: number
   activeRoomCount: number
+  active: boolean
+  coverImageUrl: string | null
+  images: RoomImage[]
 }
 
 export const roomApi = {

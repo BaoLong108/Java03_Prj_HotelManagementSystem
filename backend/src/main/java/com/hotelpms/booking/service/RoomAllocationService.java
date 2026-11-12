@@ -22,10 +22,18 @@ public class RoomAllocationService {
 
     private final JdbcTemplate jdbcTemplate;
     private final BookingRepository bookingRepository;
+    private final com.hotelpms.room.service.RoomAvailabilityService availability;
 
-    public RoomAllocationService(JdbcTemplate jdbcTemplate, BookingRepository bookingRepository) {
+    public RoomAllocationService(JdbcTemplate jdbcTemplate, BookingRepository bookingRepository,
+            com.hotelpms.room.service.RoomAvailabilityService availability) {
         this.jdbcTemplate = jdbcTemplate;
         this.bookingRepository = bookingRepository;
+        this.availability = availability;
+    }
+
+    public List<Long> findAvailableRoomTypeIds(Instant startAt, Instant endAt, Instant now) {
+        return availability.searchAt(startAt, endAt, 1, now).stream()
+                .map(com.hotelpms.room.service.RoomAvailabilityService.AvailableRoomType::id).toList();
     }
 
     @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
@@ -67,6 +75,8 @@ public class RoomAllocationService {
         for (Long roomId : candidateIds) {
             // Lock the candidate row for the duration of the current transaction
             lockPhysicalRoom(roomId);
+            if (!Boolean.TRUE.equals(jdbcTemplate.queryForObject(
+                    "SELECT is_active FROM physical_rooms WHERE id=?", Boolean.class, roomId))) continue;
             now = Instant.now();
             // Reclaim expired holds only while allocating a new booking, never while releasing a block.
             jdbcTemplate.update("UPDATE bookings SET status='EXPIRED',expired_at=?,updated_at=? WHERE physical_room_id=? AND status='PENDING_PAYMENT' AND hold_expires_at<=?",

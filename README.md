@@ -1,6 +1,6 @@
 # Hotel PMS Mini
 
-> Bản tích hợp Sprint 2 ngày 26/10 đã chạy Booking hold, Payment demo, RoomBlock/availability, Staff Calendar/Lookup và PDF với API/DB thật. Xem [task, contract và kết quả kiểm thử](docs/sprint2-completion.md) trước khi phát triển Sprint 3.
+> Bản tích hợp Sprint 3–4 bổ sung Loyalty/Voucher, Admin quản lý phòng và ảnh, lịch giá, Floor Map, báo cáo, Booking Timeline và yêu cầu nhận phòng online. Xem [phân công, tích hợp và hướng dẫn nghiệm thu](docs/sprint34-integration.md). VNPay và SMTP có cấu hình sandbox riêng.
 
 Monorepo cho đồ án quản lý một khách sạn. Nguyễn Ngọc Bảo Long phụ trách kỹ thuật và tích hợp. Kế hoạch chia 4 sprint, 5 thành viên; ưu tiên hoàn thành các việc P0 trước.
 
@@ -13,7 +13,9 @@ backend/                 Spring Boot API, Java 21, PostgreSQL, Flyway
     room/                RoomType, PhysicalRoom, RoomBlock, availability
     booking/             Booking, hold, trạng thái và job
     pricing/             Quote, giá và discount snapshot
-    payment/             Thanh toán demo, sau đó VNPay Sandbox
+    payment/             Thanh toán demo, VNPay Sandbox và email xác nhận
+    analytics/           Tổng hợp đặt phòng và thanh toán theo kỳ
+    report/              Danh sách theo ngày và CSV lịch đặt phòng
     loyalty/             Điểm và hạng khách hàng
     shared/              Cấu hình và thành phần dùng chung
   src/main/resources/db/migration/  Migration SQL theo thứ tự Flyway
@@ -21,10 +23,26 @@ frontend/                React + TypeScript + Vite
   src/features/           Mã giao diện theo nghiệp vụ
   src/shared/api/         API client dùng chung
 docs/                    Quy ước kiến trúc, API, cộng tác
-compose.yaml             PostgreSQL cho local
+compose.yaml             PostgreSQL + backend + frontend cho demo
 ```
 
-Backend đã có entity tài khoản, đăng ký/đăng nhập JWT và `/api/v1/auth/me`. Frontend có hai cổng responsive cho khách và Staff/Admin, trang chủ với ảnh concept, tìm phòng/quote thật, hold 15 phút, thanh toán demo, lịch sử booking, PDF và lịch/tra cứu Staff. Auth nối API thật, JWT và menu theo vai trò. Xem [hướng dẫn frontend](frontend/README.md), [nhật ký redesign](docs/frontend-redesign.md) và [hợp đồng API Auth](docs/auth.md). Cộng điểm/nâng hạng, VNPay và báo cáo theo các sprint tiếp theo.
+Backend có đăng ký/đăng nhập JWT và `/api/v1/auth/me`. Frontend có cổng khách và Staff/Admin, tìm phòng/quote thật, hold 15 phút, thanh toán demo, lịch sử booking và PDF. Trang `/account` đọc điểm, chi tiêu, hạng và lịch sử tích điểm từ database. Booking đã thanh toán và hoàn tất được cộng điểm một lần. Admin quản lý phòng/ảnh tại `/admin/rooms`, giá tại `/admin/rate-calendar`, báo cáo tại `/admin/analytics`, CSV lịch tại `/admin/booking-export`. Staff dùng lịch, tra cứu/theo ngày, `/staff/room-blocks`, `/staff/rooms` và `/staff/check-in-requests`. Customer mở chi tiết từ Kỳ nghỉ của tôi để xem Timeline và gửi giờ đến. Cấu hình VNPay/SMTP và giới hạn nghiệm thu có trong [bàn giao tích hợp](docs/sprint34-integration.md).
+
+## Chạy cả hệ thống bằng một lệnh
+
+Customer còn có thể đổi 50/100/200 điểm lấy mã giảm 400.000/1.000.000/2.200.000 VND tại `/account`, rồi nhập mã 6 ký tự ở bước thanh toán. Mã giảm trên giá sau hạng, số phải trả thấp nhất 0 VND. Chi tiết và migration V3: [đổi điểm lấy mã giảm giá](docs/loyalty-vouchers.md).
+
+Cần Docker Desktop/Engine với Compose v2 đang chạy. Tại gốc repository:
+
+```sh
+docker compose up --build -d --wait
+```
+
+Mở [web đăng nhập](http://localhost:5173/login). Tài khoản seed gồm `customer@hotel-pms.test`, `staff@hotel-pms.test` và `admin@hotel-pms.test`. Mật khẩu demo trên database mới là `HotelPmsDemo123!`. Database cũ giữ nguyên mật khẩu đã đặt.
+
+Compose dùng named volume `postgres_data` để giữ dữ liệu. `docker compose stop` hoặc `docker compose down` không xóa dữ liệu. Muốn chạy lại: dùng lệnh `up` ở trên. `.env.example` chứa cấu hình demo công khai, sao chép sang `.env` khi cần đổi port/mật khẩu. Nếu đang chạy local riêng, dừng các server đó hoặc đổi `WEB_PORT`, `API_PORT`, `POSTGRES_PORT` để tránh trùng port. Backend dùng Flyway và `ddl-auto=validate`, không tạo lại bảng mỗi lần chạy.
+
+Kịch bản demo, kiểm thử, giới hạn và cách xem log: [hướng dẫn Sprint 3–4](docs/sprint34-long-handover.md).
 
 ## Chạy local
 

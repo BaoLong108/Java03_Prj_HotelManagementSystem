@@ -107,7 +107,7 @@ class AuthIntegrationTest {
     void postgresMigrationAndApplicationHealthAreReady() throws Exception {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM information_schema.tables "
                 + "WHERE table_schema = 'public' AND table_name <> 'flyway_schema_history'", Integer.class))
-                .isEqualTo(10);
+                .isEqualTo(16);
         assertThat(jdbc.queryForObject("SELECT success FROM flyway_schema_history WHERE version = '1'", Boolean.class))
                 .isTrue();
         assertThat(roles.findAll()).extracting(role -> role.getCode())

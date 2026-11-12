@@ -1,0 +1,237 @@
+openapi: 3.0.3
+info:
+  title: Hotel PMS Floor Overview and Rate Calendar
+  version: '1.0'
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+paths:
+  /staff/floor-overview:
+    get:
+      summary: Get physical rooms grouped by floor (STAFF or ADMIN)
+      description: >-
+        At server time asOf, active blocks and current booking assignments are returned separately.
+        ASSIGNED means a confirmed reservation covers the instant. HELD means an unexpired hold covers it.
+        The data source has no physical check-in or housekeeping state. Null floorNumber groups unassigned floors.
+      responses:
+        '200':
+          description: Floor overview without customer identities
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [asOf, floors]
+                properties:
+                  asOf: { type: string, format: date-time }
+                  floors:
+                    type: array
+                    items:
+                      type: object
+                      required: [floorNumber, rooms]
+                      properties:
+                        floorNumber: { type: integer, nullable: true }
+                        rooms:
+                          type: array
+                          items: { $ref: '#/components/schemas/FloorRoom' }
+        '401': { description: Authentication required }
+        '403': { description: Staff or Admin role required }
+  /admin/rate-calendar:
+    get:
+      summary: Read effective nightly rates for a calendar month (ADMIN)
+      parameters:
+        - $ref: '#/components/parameters/RoomTypeId'
+        - name: month
+          in: query
+          required: true
+          schema: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
+      responses:
+        '200':
+          description: Effective rates before membership and voucher discounts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  roomTypeId: { type: integer, format: int64 }
+                  month: { type: string, example: '2032-02' }
+                  baseRate: { type: number }
+                  nights:
+                    type: array
+                    items: { $ref: '#/components/schemas/Night' }
+                  rules:
+                    type: array
+                    items: { $ref: '#/components/schemas/RateRule' }
+        '400': { description: Invalid month }
+        '401': { description: Authentication required }
+        '403': { description: Admin role required }
+        '404': { description: Room type missing or inactive }
+  /admin/rate-calendar/preview:
+    post:
+      summary: Preview a rule without saving (ADMIN)
+      description: >-
+        For an edit, ruleId identifies the rule to replace. Preview covers the union of its old and new dates.
+        Highest priority wins in order OVERRIDE, HOLIDAY, SEASONAL, WEEKEND, then base rate.
+      parameters:
+        - name: ruleId
+          in: query
+          schema: { type: integer, format: int64 }
+      requestBody: { $ref: '#/components/requestBodies/RateDraft' }
+      responses:
+        '200':
+          description: Night-by-night comparison
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    before: { $ref: '#/components/schemas/Night' }
+                    after: { $ref: '#/components/schemas/Night' }
+        '400': { description: Invalid price or date range }
+        '401': { description: Authentication required }
+        '403': { description: Admin role required }
+        '404': { description: Room type or active rule missing }
+        '409': { description: Active rule of the same kind overlaps }
+  /admin/rate-calendar/{roomTypeId}/base-rate:
+    patch:
+      summary: Change the room type base nightly rate (ADMIN)
+      parameters:
+        - name: roomTypeId
+          in: path
+          required: true
+          schema: { type: integer, format: int64, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nightlyRate]
+              properties:
+                nightlyRate: { $ref: '#/components/schemas/MoneyInput' }
+      responses:
+        '204': { description: Updated base rate }
+        '400': { description: Invalid price }
+        '401': { description: Authentication required }
+        '403': { description: Admin role required }
+        '404': { description: Room type missing or inactive }
+  /admin/rate-rules:
+    post:
+      summary: Create a nightly rate rule (ADMIN)
+      requestBody: { $ref: '#/components/requestBodies/RateDraft' }
+      responses:
+        '201': { $ref: '#/components/responses/SavedRule' }
+        '400': { description: Invalid price or date range }
+        '401': { description: Authentication required }
+        '403': { description: Admin role required }
+        '404': { description: Room type missing or inactive }
+        '409': { description: Active rule of the same kind overlaps }
+  /admin/rate-rules/{id}:
+    put:
+      summary: Replace the full scope of an active rule (ADMIN)
+      parameters:
+        - $ref: '#/components/parameters/RuleId'
+      requestBody: { $ref: '#/components/requestBodies/RateDraft' }
+      responses:
+        '200': { $ref: '#/components/responses/SavedRule' }
+        '400': { description: Invalid price or date range }
+        '401': { description: Authentication required }
+        '403': { description: Admin role required }
+        '404': { description: Room type or active rule missing }
+        '409': { description: Active rule of the same kind overlaps }
+  /admin/rate-rules/{id}/deactivate:
+    patch:
+      summary: Deactivate a rate rule for future quotes (ADMIN)
+      parameters:
+        - $ref: '#/components/parameters/RuleId'
+        - $ref: '#/components/parameters/RoomTypeId'
+      responses:
+        '204': { description: Rule deactivated }
+        '401': { description: Authentication required }
+        '403': { description: Admin role required }
+        '404': { description: Room type or active rule missing }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  parameters:
+    RoomTypeId:
+      name: roomTypeId
+      in: query
+      required: true
+      schema: { type: integer, format: int64, minimum: 1 }
+    RuleId:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, format: int64, minimum: 1 }
+  requestBodies:
+    RateDraft:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/RateDraft' }
+  responses:
+    SavedRule:
+      description: Persisted rate rule
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/RateRule' }
+  schemas:
+    FloorRoom:
+      type: object
+      properties:
+        roomId: { type: integer, format: int64 }
+        roomNumber: { type: string }
+        roomTypeId: { type: integer, format: int64 }
+        roomTypeName: { type: string }
+        operationalStatus: { type: string, enum: [AVAILABLE, ASSIGNED, HELD, BLOCKED, OUT_OF_SERVICE] }
+        updatedAt: { type: string, format: date-time }
+        block:
+          type: object
+          nullable: true
+          properties:
+            id: { type: integer, format: int64 }
+            startAt: { type: string, format: date-time }
+            endAt: { type: string, format: date-time }
+            reason: { type: string }
+        assignment:
+          type: object
+          nullable: true
+          properties:
+            bookingCode: { type: string }
+            status: { type: string, enum: [CONFIRMED, PENDING_PAYMENT] }
+            startAt: { type: string, format: date-time }
+            endAt: { type: string, format: date-time }
+    MoneyInput:
+      description: Non-negative VND rate with up to 13 integer and 2 fractional digits
+      oneOf:
+        - { type: number, minimum: 0, maximum: 9999999999999.99 }
+        - { type: string, pattern: '^[0-9]{1,13}(\.[0-9]{1,2})?$' }
+    RateDraft:
+      type: object
+      description: Both dates are inclusive hotel-local nights. At most 366 nights per rule. WEEKEND covers Saturday and Sunday only.
+      required: [roomTypeId, kind, startsOn, endsOn, nightlyRate]
+      properties:
+        roomTypeId: { type: integer, format: int64, minimum: 1 }
+        kind: { type: string, enum: [OVERRIDE, HOLIDAY, SEASONAL, WEEKEND] }
+        startsOn: { type: string, format: date }
+        endsOn: { type: string, format: date }
+        nightlyRate: { $ref: '#/components/schemas/MoneyInput' }
+    RateRule:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        kind: { type: string, enum: [OVERRIDE, HOLIDAY, SEASONAL, WEEKEND] }
+        startsOn: { type: string, format: date }
+        endsOn: { type: string, format: date }
+        nightlyRate: { type: number }
+    Night:
+      type: object
+      properties:
+        date: { type: string, format: date }
+        nightlyRate: { type: number }
+        weekend: { type: boolean }
+        kind: { type: string, nullable: true, enum: [OVERRIDE, HOLIDAY, SEASONAL, WEEKEND, null] }
+        ruleId: { type: integer, format: int64, nullable: true }

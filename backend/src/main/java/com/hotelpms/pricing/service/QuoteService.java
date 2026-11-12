@@ -6,9 +6,11 @@ import com.hotelpms.pricing.dto.QuoteResponse;
 import com.hotelpms.pricing.port.LoyaltyPricingPort;
 import com.hotelpms.pricing.port.RoomTypePricingPort;
 import com.hotelpms.pricing.port.RoomTypePricingPort.RoomTypeInfo;
+import com.hotelpms.pricing.repository.RateRuleRepository;
 import com.hotelpms.shared.api.ApiException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 import org.springframework.http.HttpStatus;
@@ -20,7 +22,7 @@ import org.springframework.stereotype.Service;
  * <p>Công thức (VND, {@link BigDecimal}, HALF_UP):
  * <ul>
  *   <li>{@code nights = toLocalDate(endAt) - toLocalDate(startAt)}</li>
- *   <li>{@code baseAmount = basePricePerNight × nights}</li>
+ *   <li>{@code baseAmount = sum(effective nightly rates)}</li>
  *   <li>{@code discountAmount = baseAmount × discountRate}</li>
  *   <li>{@code payableAmount = baseAmount - discountAmount}</li>
  * </ul>
@@ -42,10 +44,13 @@ public class QuoteService {
 
     private final RoomTypePricingPort roomTypes;
     private final LoyaltyPricingPort loyalty;
+    private final RateRuleRepository rateRules;
+    private static final ZoneId HOTEL_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
-    public QuoteService(RoomTypePricingPort roomTypes, LoyaltyPricingPort loyalty) {
+    public QuoteService(RoomTypePricingPort roomTypes, LoyaltyPricingPort loyalty, RateRuleRepository rateRules) {
         this.roomTypes = roomTypes;
         this.loyalty = loyalty;
+        this.rateRules = rateRules;
     }
 
     /**
@@ -67,7 +72,9 @@ public class QuoteService {
                     "Số khách vượt quá sức chứa của loại phòng");
         }
 
-        long nights = nightsBetween(request);
+        var firstNight = request.startAt().atZoneSameInstant(HOTEL_ZONE).toLocalDate();
+        var checkout = request.endAt().atZoneSameInstant(HOTEL_ZONE).toLocalDate();
+        long nights = ChronoUnit.DAYS.between(firstNight, checkout);
         if (nights < 1) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_NIGHTS", "Số đêm tối thiểu là 1");
         }
@@ -75,7 +82,8 @@ public class QuoteService {
         LoyaltyTier tier = resolveTier(customerId);
         BigDecimal discountRate = discountRateOf(tier).setScale(RATE_SCALE, MONEY_ROUNDING);
         BigDecimal basePricePerNight = money(roomType.basePricePerNight());
-        BigDecimal baseAmount = money(basePricePerNight.multiply(BigDecimal.valueOf(nights)));
+        var rules = rateRules.overlapping(roomType.id(), firstNight, checkout.minusDays(1));
+        BigDecimal baseAmount = money(NightlyPricing.total(firstNight, checkout, basePricePerNight, rules));
         BigDecimal discountAmount = money(baseAmount.multiply(discountRate));
         BigDecimal payableAmount = money(baseAmount.subtract(discountAmount));
 
@@ -103,12 +111,6 @@ public class QuoteService {
         if (request.guestCount() < 1 || request.guestCount() > 20) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "guestCount phải từ 1 đến 20");
         }
-    }
-
-    private long nightsBetween(QuoteRequest request) {
-        var zone = java.time.ZoneId.of("Asia/Ho_Chi_Minh");
-        return ChronoUnit.DAYS.between(request.startAt().atZoneSameInstant(zone).toLocalDate(),
-                request.endAt().atZoneSameInstant(zone).toLocalDate());
     }
 
     private LoyaltyTier resolveTier(Long customerId) {
