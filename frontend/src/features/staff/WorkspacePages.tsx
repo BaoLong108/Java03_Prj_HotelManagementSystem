@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Badge, Button, Card, DataTable, EmptyState, Field, LinkButton, PageHeader } from '../../shared/ui'
 import { Icon } from '../../shared/ui/Icon'
-import type { IconName } from '../../shared/ui/Icon'
+import { ReportDashboard } from './reports/ReportDashboard'
+import { BlockHistory } from './reports/BlockHistory'
 import { useServiceHealth } from '../../shared/api/health'
 import { useAuth } from '../auth/AuthProvider'
 import { MembershipBenefits } from '../auth/MembershipBenefits'
@@ -19,17 +20,8 @@ function ServiceStatus() {
 
 export function StaffPage() {
   const { user } = useAuth()
-  const stats: { label: string; icon: IconName; hint: string }[] = [
-    { label: 'Doanh thu', icon: 'wallet', hint: 'Tổng doanh thu được ghi nhận' }, { label: 'Đặt phòng', icon: 'calendar', hint: 'Tổng số đặt phòng' },
-    { label: 'Công suất phòng', icon: 'chart', hint: 'Tỷ lệ phòng được đặt' }, { label: 'RevPAR', icon: 'building', hint: 'Doanh thu trên phòng sẵn có' },
-    { label: 'Phòng khả dụng', icon: 'bed', hint: 'Theo lịch lưu trú' }, { label: 'Phòng đã đặt', icon: 'key', hint: 'Đặt phòng được xác nhận' },
-    { label: 'Chờ thanh toán', icon: 'clock', hint: 'Giữ chỗ còn hiệu lực' }, { label: 'Kỳ nghỉ hoàn tất', icon: 'check', hint: 'Trạng thái COMPLETED' },
-  ]
   return <><PageHeader eyebrow="PROPERTY OVERVIEW" title={`Chào ${user?.fullName.split(' ').at(-1) ?? 'bạn'}, một ngày làm việc mới.`} description="Tổng quan khách sạn và lối tắt đến những công việc hằng ngày." action={<span className="today-label"><Icon name="calendar" size={16} />{displayDate(hotelToday())}</span>} />
-    <div className="workspace-banner"><div><Icon name="info" /><p>Báo cáo vận hành chưa sẵn sàng. Các chỉ số chưa có dữ liệu được hiển thị bằng dấu “—”.</p></div><Badge>Đang chuẩn bị</Badge></div>
-    <div className="stats-grid">{stats.map((stat) => <Card className="stat-card" key={stat.label}><div><span>{stat.label}</span><Icon name={stat.icon} size={18} /></div><strong aria-label="Chưa có dữ liệu">—</strong><p>{stat.hint}</p></Card>)}</div>
-    <div className="workspace-dashboard-grid"><Card className="analytics-card"><div className="card-heading"><div><h2>Doanh thu & xu hướng đặt phòng</h2><p className="small muted">Tổng hợp theo kỳ báo cáo</p></div><Icon name="chart" /></div><EmptyState icon="chart" title="Biểu đồ sẽ xuất hiện khi có báo cáo" description="Chưa có số liệu doanh thu, công suất hoặc doanh thu theo loại phòng được xác nhận." /></Card>
-      <ServiceStatus /></div>
+    <ReportDashboard />
     <div className="section-heading"><h2>Công việc thường dùng</h2></div><div className="quick-grid">{[
       { to: '/staff/bookings', title: 'Quản lý đặt phòng', description: 'Tra cứu và theo dõi kỳ nghỉ', icon: 'calendar' as const },
       { to: '/staff/calendar', title: 'Lịch phòng', description: 'Xem lịch theo ngày và tuần', icon: 'clock' as const },
@@ -58,7 +50,7 @@ export function CalendarPage() {
 }
 
 export function RoomOperationsPage() {
-  return <><PageHeader eyebrow="ROOM OPERATIONS" title="Tình trạng phòng" description="Theo dõi phòng vật lý và các khoảng thời gian bị chặn." /><RoomOperations />
+  return <><PageHeader eyebrow="ROOM OPERATIONS" title="Tình trạng phòng" description="Theo dõi phòng vật lý và các khoảng thời gian bị chặn." /><RoomOperations /><BlockHistory />
     <section className="operation-availability"><h2>Các nghiệp vụ chưa được hỗ trợ</h2><p className="muted">Các công cụ dưới đây chưa có trong phiên bản khách sạn mini hiện tại.</p><div className="operation-grid">{[
       ['Check-in / Check-out', 'Chưa có quy trình nhận, trả phòng do nhân viên thực hiện.'], ['Housekeeping', 'Chưa có trạng thái dọn phòng hoặc phân công nhân viên.'], ['Folio & phụ thu', 'Chưa có sổ chi phí, quyết toán hoặc dịch vụ bổ sung.'],
     ].map(([title, description]) => <div key={title}><span className="outline-label">CHƯA HỖ TRỢ</span><h3>{title}</h3><p>{description}</p></div>)}</div></section>
@@ -86,3 +78,4 @@ export function AdminSettingsPage() {
   return <><PageHeader eyebrow="SETTINGS" title="Cài đặt khách sạn" description="Cấu hình và quyền truy cập cho nhóm vận hành." /><div className="settings-grid"><Card><h2>Quy tắc lưu trú hiện tại</h2><dl className="details-list"><div><dt>Phạm vi</dt><dd>Một khách sạn</dd></div><div><dt>Giờ đến</dt><dd>12:00</dd></div><div><dt>Giờ đi</dt><dd>10:00</dd></div><div><dt>Múi giờ hiển thị</dt><dd>Việt Nam (UTC+7)</dd></div><div><dt>Thời hạn giữ chỗ</dt><dd>15 phút từ máy chủ</dd></div></dl><p className="small muted">Thông tin tham chiếu theo cấu hình nghiệp vụ. Chưa hỗ trợ thay đổi trên giao diện.</p></Card>
       <Card><EmptyState icon="shield" title="Quản lý nhân viên chưa sẵn sàng" description="Thêm tài khoản, thay đổi vai trò và khóa nhân viên sẽ được mở khi có dịch vụ quản trị tài khoản." /></Card></div></>
 }
+

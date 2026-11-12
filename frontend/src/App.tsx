@@ -13,6 +13,7 @@ import { ForbiddenPage, NotFoundPage, UiKitPage } from './shared/ui/ExamplePages
 import { ToastProvider } from './shared/ui'
 import { RoomCalendarPage } from './features/staff/calendar/RoomCalendarPage'
 import { FloorMapPage } from './features/staff/floors/FloorMapPage'
+import { BlockHistory } from './features/staff/reports/BlockHistory'
 import { RateCalendarPage } from './features/pricing/RateCalendarPage'
 import { AnalyticsPage } from './features/analytics/AnalyticsPage'
 import { BookingTimelinePage } from './features/checkin/BookingTimelinePage'
@@ -45,7 +46,7 @@ export default function App() {
         <Route path="staff/bookings" element={<StaffBookings />} />
         <Route path="staff/calendar" element={<RoomCalendarPage />} />
       </Route>
-      <Route path="staff/rooms" element={<FloorMapPage />} />
+      <Route path="staff/rooms" element={<><FloorMapPage /><BlockHistory /></>} />
       <Route path="staff/room-blocks" element={<RoomOperationsPage />} />
       <Route path="staff/check-in-requests" element={<StaffCheckInPage />} />
     </Route>
