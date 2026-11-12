@@ -44,6 +44,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/rooms", "/api/v1/rooms/availability", "/api/v1/rooms/{id}").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/payments/demo").hasRole("CUSTOMER")
                         .requestMatchers(HttpMethod.GET, "/api/v1/staff/bookings/daily").hasAnyRole("STAFF", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/staff/reports/summary", "/api/v1/staff/reports/room-block-history").hasAnyRole("STAFF", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/admin/reports/bookings.csv").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/staff/room-calendar", "/api/v1/staff/bookings/search")
                             .hasAnyRole("STAFF", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/bookings/{bookingCode}/confirmation.pdf")

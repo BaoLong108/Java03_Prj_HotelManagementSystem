@@ -1,0 +1,17 @@
+@import '../shared/operations.css';
+.reports { display: grid; gap: 18px; min-width: 0; margin-block: 18px; }
+.reports .stats-grid { margin: 0; }
+.reports .stat-card strong { overflow-wrap: anywhere; font-size: clamp(1.3rem, 2vw, 2rem); }
+.reports .report-counts { display: flex; flex-wrap: wrap; gap: 16px; margin: 0; }
+.report-chart, .block-history { min-width: 0; }
+.chart-scroll { overflow-x: auto; max-width: 100%; }
+.chart-scroll svg { display: block; width: 100%; min-width: 620px; }
+.chart-scroll text { font: 12px sans-serif; fill: #49615e; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 20px; }
+.chart-legend span:first-child { color: #376b68; }
+.chart-legend span:last-child { color: #9a5a13; }
+.reports .table-scroll { max-width: 100%; overflow-x: auto; }
+.block-history table { min-width: 1200px; }
+.block-history td { max-width: 260px; overflow-wrap: anywhere; white-space: normal; }
+.report-policy { padding: 16px; background: #edf2ef; border-radius: 12px; }
+.reports summary { cursor: pointer; padding-block: 10px; }

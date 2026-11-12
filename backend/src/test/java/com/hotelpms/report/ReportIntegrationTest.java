@@ -85,4 +85,54 @@ class ReportIntegrationTest {
             assertThat(json.readTree(response.body()).path("code").asText()).isEqualTo("INVALID_FILTER");
         }
     }
+
+    @Test void summaryHistoryAndCsvUseRealApiDataAndEnforceRoles() throws Exception {
+        String admin = login("admin"), staff = login("staff"), customer = login("customer");
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        String range = "?from=2081-06-02&to=2081-06-03";
+        var before = ok("GET", "/api/v1/staff/reports/summary" + range, staff, null);
+        long type = ok("POST", "/api/v1/admin/rooms/types", admin, Map.of("code", "S" + suffix, "name", "=Phòng, \"Việt\"", "maxOccupancy", 2, "basePricePerNight", 100000)).path("id").asLong();
+        long room = ok("POST", "/api/v1/admin/rooms/physical", admin, Map.of("roomTypeId", type, "roomNumber", "S" + suffix, "floorNumber", 1)).path("id").asLong();
+        long blockedRoom = ok("POST", "/api/v1/admin/rooms/physical", admin, Map.of("roomTypeId", type, "roomNumber", "B" + suffix, "floorNumber", 1)).path("id").asLong();
+        long inactive = ok("POST", "/api/v1/admin/rooms/physical", admin, Map.of("roomTypeId", type, "roomNumber", "I" + suffix, "floorNumber", 1)).path("id").asLong();
+        assertThat(request("DELETE", "/api/v1/admin/rooms/physical/" + inactive, admin, null).statusCode()).isEqualTo(204);
+        String code = ok("POST", "/api/v1/bookings", customer, Map.of("roomTypeId", type, "guestCount", 1,
+                "startAt", "2081-06-01T12:00:00+07:00", "endAt", "2081-06-03T10:00:00+07:00")).path("bookingCode").asText();
+        var booking = ok("GET", "/api/v1/bookings/" + code, customer, null);
+        long assigned = booking.path("physicalRoomId").asLong();
+        long freeRoom = assigned == blockedRoom ? room : blockedRoom;
+        var today = java.time.LocalDate.now(ReportFilters.ZONE);
+        String todayRange = "?from=" + today + "&to=" + today.plusDays(1);
+        var revenueBefore = new java.math.BigDecimal(ok("GET", "/api/v1/staff/reports/summary" + todayRange, staff, null).path("revenue").asText());
+        ok("POST", "/api/v1/payments/demo", customer, Map.of("bookingCode", code, "idempotencyKey", "report-" + suffix));
+        var revenueAfter = new java.math.BigDecimal(ok("GET", "/api/v1/staff/reports/summary" + todayRange, staff, null).path("revenue").asText());
+        assertThat(revenueAfter.subtract(revenueBefore)).isEqualByComparingTo(booking.path("payableAmount").asText());
+        long block = ok("POST", "/api/v1/admin/room-blocks", staff, Map.of("physicalRoomId", freeRoom,
+                "startAt", "2081-06-02T12:00:00+07:00", "endAt", "2081-06-03T10:00:00+07:00", "reason", "@Bảo trì, \"điện\"\nTầng 1")).path("id").asLong();
+        var summary = ok("GET", "/api/v1/staff/reports/summary" + range, staff, null);
+        assertThat(summary.path("availableRoomNights").asLong()).isEqualTo(before.path("availableRoomNights").asLong() + 1);
+        assertThat(summary.path("soldRoomNights").asLong()).isEqualTo(before.path("soldRoomNights").asLong() + 1);
+        assertThat(summary.path("daily").size()).isEqualTo(1);
+        assertThat(summary.path("revenue").asText()).isEqualTo("0");
+        String historyPath = "/api/v1/staff/reports/room-block-history" + range + "&roomId=" + freeRoom;
+        var history = ok("GET", historyPath, staff, null);
+        assertThat(history.get(0).path("active").asBoolean()).isTrue();
+        assertThat(history.get(0).path("createdByName").asText()).isNotBlank();
+        assertThat(history.toString()).doesNotContain("email", "phoneNumber", "password");
+        ok("DELETE", "/api/v1/admin/room-blocks/" + block, staff, null);
+        var released = ok("GET", historyPath, staff, null).get(0);
+        assertThat(released.path("active").asBoolean()).isFalse();
+        assertThat(released.path("releasedAt").isNull()).isFalse();
+        assertThat(ok("GET", "/api/v1/staff/reports/summary" + range, staff, null).path("availableRoomNights").asLong())
+                .isEqualTo(before.path("availableRoomNights").asLong() + 2);
+        var csv = request("GET", "/api/v1/admin/reports/bookings.csv" + range, admin, null);
+        assertThat(csv.statusCode()).isEqualTo(200); assertThat(csv.body()).startsWith("\uFEFF");
+        assertThat(csv.headers().firstValue("Content-Type").orElse("")).contains("text/csv", "UTF-8");
+        assertThat(csv.body()).contains(code, "ROOM_BLOCKS", "'@Bảo trì", "'=Phòng", "Đã mở", "02/06/2081 12:00");
+        assertThat(request("GET", "/api/v1/admin/reports/bookings.csv" + range, staff, null).statusCode()).isEqualTo(403);
+        for (String path : new String[]{"/api/v1/staff/reports/summary", "/api/v1/staff/reports/room-block-history", "/api/v1/admin/reports/bookings.csv"}) {
+            assertThat(request("GET", path + range, customer, null).statusCode()).isEqualTo(403);
+            assertThat(request("GET", path + "?from=2081-01-01&to=2082-01-01", admin, null).statusCode()).isEqualTo(400);
+        }
+    }
 }
