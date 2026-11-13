@@ -17,7 +17,7 @@ import {
 } from './types'
 import type { BookingResponse, PriceQuote, RoomType } from './types'
 import { errorMessage } from '../../shared/api/client'
-import { Alert, Badge, Button, Card, EmptyState, Field, LoadingState, PageHeader } from '../../shared/ui'
+import { Alert, Badge, Button, Card, ConfirmDialog, EmptyState, Field, LoadingState, PageHeader } from '../../shared/ui'
 import { Icon } from '../../shared/ui/Icon'
 
 type Step = 'SEARCH' | 'HOLD' | 'CONFIRMED'
@@ -45,7 +45,10 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
   const [guestCount, setGuestCount] = useState<number>(initialStay.adults + initialStay.children)
 
   // Room Catalog
-  const [selectedRoomId, setSelectedRoomId] = useState<number>(0)
+  const initialRoomParam = searchParams.get('roomTypeId') || searchParams.get('room')
+  const initialRoomId = initialRoomParam ? Number(initialRoomParam) : 0
+  const validInitialRoomId = Number.isInteger(initialRoomId) && initialRoomId > 0 ? initialRoomId : 0
+  const [selectedRoomId, setSelectedRoomId] = useState<number>(() => validInitialRoomId)
   const [searchRetry, setSearchRetry] = useState(0)
   const searchKey = `${checkInDate}|${checkOutDate}|${guestCount}|${searchRetry}`
   const [availability, setAvailability] = useState<{ key: string; rooms?: RoomType[]; error?: string }>({ key: '' })
@@ -60,6 +63,7 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
   const [currentBooking, setCurrentBooking] = useState<BookingResponse | null>(null)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [cancelTargetCode, setCancelTargetCode] = useState<string | null>(null)
 
   // My Bookings State
   const [myBookings, setMyBookings] = useState<BookingResponse[]>([])
@@ -78,7 +82,10 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
       .then(data => {
         if (!controller.signal.aborted) {
           setAvailability({ key: searchKey, rooms: data })
-          setSelectedRoomId(previous => data.some(room => room.id === previous) ? previous : data[0]?.id ?? 0)
+          setSelectedRoomId(previous => {
+            const candidate = previous || validInitialRoomId
+            return data.some(room => room.id === candidate) ? candidate : data[0]?.id ?? 0
+          })
         }
       })
       .catch(error => { if (!controller.signal.aborted) setAvailability({ key: searchKey, error: errorMessage(error) }) })
@@ -750,7 +757,7 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
                     <Button
                       variant="ghost"
                       busy={busy}
-                      onClick={() => handleCancelBooking(currentBooking.bookingCode)}
+                      onClick={() => setCancelTargetCode(currentBooking.bookingCode)}
                       style={{ color: '#b25d53' }}
                     >
                       <Icon name="close" size={16} />
@@ -955,7 +962,7 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
                                   className="button--small"
                                   style={{ color: '#b25d53' }}
                                   busy={busy}
-                                  onClick={() => handleCancelBooking(b.bookingCode)}
+                                  onClick={() => setCancelTargetCode(b.bookingCode)}
                                 >
                                   Hủy
                                 </Button>
@@ -996,6 +1003,24 @@ export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab
           )}
         </Card>
       )}
+
+      {/* Cancellation Confirmation Dialog */}
+      <ConfirmDialog
+        open={Boolean(cancelTargetCode)}
+        title="Xác nhận hủy đặt phòng"
+        description={`Bạn có chắc chắn muốn hủy đơn giữ chỗ #${cancelTargetCode}? Phòng này sẽ được giải phóng ngay lập tức cho các khách hàng khác.`}
+        confirmLabel="Xác nhận hủy"
+        cancelLabel="Giữ lại"
+        variant="danger"
+        busy={busy}
+        onClose={() => setCancelTargetCode(null)}
+        onConfirm={async () => {
+          if (!cancelTargetCode) return
+          const code = cancelTargetCode
+          setCancelTargetCode(null)
+          await handleCancelBooking(code)
+        }}
+      />
     </div>
   )
 }

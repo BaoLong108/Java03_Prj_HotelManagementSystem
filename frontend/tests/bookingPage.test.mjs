@@ -59,14 +59,15 @@ async function click(element) {
   await act(async () => element.click())
 }
 async function mount(t, overrides = {}) {
+  const { initialEntry, auth: testAuth, ...apiOverrides } = overrides
   Object.assign(bookingApi, originalApi, {
     search: async () => [room],
     quote: async selected => ({ roomType: selected, guestCount: 2, nights: 2, appliedTier: 'STANDARD',
       baseAmount: 2000000, discountRate: 0, discountAmount: 0, payableAmount: 2000000 }),
     create: async () => hold(), getByCode: async () => hold(), getMyBookings: async () => [],
-    ...overrides,
+    ...apiOverrides,
   })
-  auth.setTestAuth({ user: { id: 10, roles: ['CUSTOMER'] } })
+  auth.setTestAuth(testAuth ?? { user: { id: 10, roles: ['CUSTOMER'] } })
   const container = dom.window.document.createElement('div')
   dom.window.document.body.append(container)
   const root = createRoot(container)
@@ -75,7 +76,7 @@ async function mount(t, overrides = {}) {
     container.remove()
     Object.assign(bookingApi, originalApi)
   })
-  await act(async () => root.render(createElement(MemoryRouter, { initialEntries: ['/rooms?arrival=2026-11-10&departure=2026-11-12&adults=2'] }, createElement(BookingPage))))
+  await act(async () => root.render(createElement(MemoryRouter, { initialEntries: [initialEntry ?? '/rooms?arrival=2026-11-10&departure=2026-11-12&adults=2'] }, createElement(BookingPage))))
   return container
 }
 async function changeGuestCount(view, value) {
@@ -186,4 +187,62 @@ test('leaving a hold aborts its status read and ignores late confirmation', asyn
   await act(async () => pending.resolve({ ...hold(), status: 'CONFIRMED' }))
   assert.doesNotMatch(view.textContent, /Đặt phòng đã được xác nhận/)
   assert.match(view.textContent, /Chọn loại phòng/)
+})
+
+test('room selection restores from query parameters', async t => {
+  const room2 = { id: 2, code: 'DELUXE', name: 'Deluxe Suite', maxOccupancy: 4, basePricePerNight: 1500000 }
+  let quotedRoom = null
+  const view = await mount(t, {
+    initialEntry: '/rooms?arrival=2026-11-10&departure=2026-11-12&adults=2&roomTypeId=2',
+    search: async () => [room, room2],
+    quote: async selected => {
+      quotedRoom = selected
+      return { roomType: selected, guestCount: 2, nights: 2, appliedTier: 'STANDARD',
+        baseAmount: 3000000, discountRate: 0, discountAmount: 0, payableAmount: 3000000 }
+    },
+  })
+  assert.equal(quotedRoom?.id, 2)
+  assert.match(view.textContent, /Deluxe Suite/)
+})
+
+test('guest sees login prompt with dynamic return path preserving room and dates', async t => {
+  const room2 = { id: 2, code: 'DELUXE', name: 'Deluxe Suite', maxOccupancy: 4, basePricePerNight: 1500000 }
+  const view = await mount(t, {
+    auth: { user: null },
+    initialEntry: '/rooms?arrival=2026-11-10&departure=2026-11-12&adults=2&roomTypeId=2',
+    search: async () => [room, room2],
+  })
+  const loginLink = [...view.querySelectorAll('a')].find(item => item.textContent.includes('Đăng nhập để đặt phòng'))
+  assert.ok(loginLink, 'Expected login link to exist for guest')
+  assert.match(loginLink.getAttribute('href'), /\/login/)
+})
+
+test('cancelling hold opens confirmation dialog before calling cancel api', async t => {
+  t.mock.timers.enable({ apis: ['Date', 'setInterval'], now: NOW })
+  let cancelCalled = false
+  const view = await mount(t, {
+    cancel: async () => {
+      cancelCalled = true
+      return { ...hold(), status: 'CANCELLED' }
+    },
+  })
+  // Go to HOLD step
+  await click(button(view, 'Tiến hành giữ phòng'))
+  assert.match(view.textContent, /BK261027-TEST01/)
+
+  // Click "Hủy giữ chỗ" button
+  await click(button(view, 'Hủy giữ chỗ'))
+
+  // Confirmation dialog should be displayed and cancel API not called yet
+  assert.equal(cancelCalled, false)
+  assert.match(view.textContent, /Xác nhận hủy đặt phòng/)
+  assert.match(view.textContent, /Bạn có chắc chắn muốn hủy đơn giữ chỗ/)
+
+  // Click confirm cancel button inside dialog
+  const confirmButton = [...view.querySelectorAll('button')].find(item => item.textContent.trim() === 'Xác nhận hủy')
+  await click(confirmButton)
+
+  // Now cancel API should be called and booking shows cancelled state
+  assert.equal(cancelCalled, true)
+  assert.match(view.textContent, /Đơn đặt phòng này đã được hủy thành công/)
 })

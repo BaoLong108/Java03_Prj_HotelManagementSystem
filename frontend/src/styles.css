@@ -32,6 +32,8 @@ main:focus { outline: none; }
 .button--primary:hover:not(:disabled) { background: var(--primary-hover); box-shadow: 0 4px 12px #19384018; }
 .button--secondary { background: #fff; color: var(--primary); border-color: #d8ddd8; }
 .button--secondary:hover:not(:disabled) { background: #f1f3ee; border-color: #a8b4ac; }
+.button--danger { background: #ad4a43; color: #fff; border-color: #ad4a43; }
+.button--danger:hover:not(:disabled) { background: #8e3b35; border-color: #8e3b35; box-shadow: 0 4px 12px #ad4a4328; }
 .button--ghost { background: transparent; color: var(--primary); padding-inline: 10px; }
 .button--ghost:hover:not(:disabled) { background: #edf0eb; }
 .button--small { min-height: 40px; padding: 10px 14px; font-size: 12px; }

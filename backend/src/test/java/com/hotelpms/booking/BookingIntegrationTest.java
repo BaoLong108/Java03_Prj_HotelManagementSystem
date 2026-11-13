@@ -364,6 +364,35 @@ class BookingIntegrationTest {
     }
 
     @Test
+    void testCancelPendingBooking_ImmediatelyReleasesRoomForNewBooking() throws Exception {
+        String token = login("customer@hotel-pms.test", PASSWORD);
+        Instant startAt = Instant.now().plus(40, ChronoUnit.DAYS).truncatedTo(ChronoUnit.HOURS);
+        Instant endAt = startAt.plus(2, ChronoUnit.DAYS).minus(2, ChronoUnit.HOURS);
+
+        // Book both available rooms
+        HttpResponse<String> book1 = post("/api/v1/bookings", new CreateBookingRequest(roomTypeId, (short) 1, startAt, endAt), token);
+        assertThat(book1.statusCode()).isEqualTo(201);
+        String code1 = tree(book1).path("bookingCode").asText();
+
+        HttpResponse<String> book2 = post("/api/v1/bookings", new CreateBookingRequest(roomTypeId, (short) 1, startAt, endAt), token);
+        assertThat(book2.statusCode()).isEqualTo(201);
+
+        // Third booking fails because both rooms are occupied
+        HttpResponse<String> book3Fail = post("/api/v1/bookings", new CreateBookingRequest(roomTypeId, (short) 1, startAt, endAt), token);
+        assertThat(book3Fail.statusCode()).isEqualTo(409);
+
+        // Cancel first booking
+        HttpResponse<String> cancelRes = post("/api/v1/bookings/" + code1 + "/cancel", null, token);
+        assertThat(cancelRes.statusCode()).isEqualTo(200);
+        assertThat(tree(cancelRes).path("status").asText()).isEqualTo(BookingStatus.CANCELLED.name());
+
+        // Now third booking succeeds immediately
+        HttpResponse<String> book3Success = post("/api/v1/bookings", new CreateBookingRequest(roomTypeId, (short) 1, startAt, endAt), token);
+        assertThat(book3Success.statusCode()).isEqualTo(201);
+        assertThat(tree(book3Success).path("status").asText()).isEqualTo(BookingStatus.PENDING_PAYMENT.name());
+    }
+
+    @Test
     void testConfirmBooking_SuccessAndIdempotency() throws Exception {
         String token = login("customer@hotel-pms.test", PASSWORD);
         Instant startAt = Instant.now().plus(30, ChronoUnit.DAYS).truncatedTo(ChronoUnit.HOURS);

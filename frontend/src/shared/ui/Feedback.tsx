@@ -9,23 +9,31 @@ export function Dialog({ open, onClose, title, children }: { open: boolean; onCl
     const dialog = ref.current
     if (!open || !dialog) return
     const previouslyFocused = document.activeElement as HTMLElement | null
-    dialog.showModal()
+    if (typeof dialog.showModal === 'function') {
+      try { dialog.showModal() } catch { /* ignore jsdom/unsupported */ }
+    }
     const overflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    return () => { dialog.close(); document.body.style.overflow = overflow; previouslyFocused?.focus() }
+    return () => {
+      if (typeof dialog.close === 'function') {
+        try { dialog.close() } catch { /* ignore jsdom/unsupported */ }
+      }
+      document.body.style.overflow = overflow
+      previouslyFocused?.focus()
+    }
   }, [open])
-  return <dialog ref={ref} className="dialog" aria-labelledby={titleId} onCancel={(event) => { event.preventDefault(); onClose() }}
+  return <dialog ref={ref} open={open} className="dialog" aria-labelledby={titleId} onCancel={(event) => { event.preventDefault(); onClose() }}
     onClick={(event) => { if (event.target === event.currentTarget) { const rect = event.currentTarget.getBoundingClientRect(); if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) onClose() } }}>
     <div className="dialog-heading"><h2 id={titleId}>{title}</h2><button type="button" className="icon-button" aria-label="Đóng hộp thoại" onClick={onClose}><Icon name="close" /></button></div>{children}
   </dialog>
 }
 
-export function ConfirmDialog({ open, title, description, onConfirm, onClose, confirmLabel = 'Xác nhận' }: {
-  open: boolean; title: string; description: string; onConfirm: () => void; onClose: () => void; confirmLabel?: string
+export function ConfirmDialog({ open, title, description, onConfirm, onClose, confirmLabel = 'Xác nhận', cancelLabel = 'Quay lại', variant = 'primary', busy = false }: {
+  open: boolean; title: string; description: string; onConfirm: () => void; onClose: () => void; confirmLabel?: string; cancelLabel?: string; variant?: 'primary' | 'danger'; busy?: boolean
 }) {
   return <Dialog open={open} title={title} onClose={onClose}><p className="muted">{description}</p><div className="dialog-actions">
-    <button className="button button--secondary" onClick={onClose} autoFocus>Quay lại</button>
-    <button className="button button--primary" onClick={() => { onConfirm(); onClose() }}>{confirmLabel}</button>
+    <button className="button button--secondary" onClick={onClose} disabled={busy} autoFocus>{cancelLabel}</button>
+    <button className={`button button--${variant}`} disabled={busy} onClick={() => { onConfirm() }}>{busy ? 'Đang xử lý…' : confirmLabel}</button>
   </div></Dialog>
 }
 
