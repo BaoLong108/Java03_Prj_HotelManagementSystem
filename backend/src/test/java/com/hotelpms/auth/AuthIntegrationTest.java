@@ -105,11 +105,12 @@ class AuthIntegrationTest {
 
     @Test
     void postgresMigrationAndApplicationHealthAreReady() throws Exception {
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM information_schema.tables "
-                + "WHERE table_schema = 'public' AND table_name <> 'flyway_schema_history'", Integer.class))
-                .isEqualTo(12);
-        assertThat(jdbc.queryForObject("SELECT success FROM flyway_schema_history WHERE version = '1'", Boolean.class))
-                .isTrue();
+        assertThat(jdbc.queryForList("SELECT table_name FROM information_schema.tables "
+                + "WHERE table_schema = 'public' AND table_name <> 'flyway_schema_history'", String.class))
+                .hasSize(21).contains("bookings", "payment_attempts", "room_types", "customer_profiles",
+                        "support_conversations", "support_messages", "hotel_faqs", "support_rate_windows");
+        assertThat(jdbc.queryForList("SELECT version FROM flyway_schema_history WHERE success AND version IN ('1','10')", String.class))
+                .containsExactlyInAnyOrder("1", "10");
         assertThat(roles.findAll()).extracting(role -> role.getCode())
                 .containsExactlyInAnyOrder(RoleCode.CUSTOMER, RoleCode.STAFF, RoleCode.ADMIN);
         HttpResponse<String> health = get("/actuator/health", null);

@@ -1,0 +1,28 @@
+.floor-map { display: grid; gap: 18px; }
+.floor-map .page-heading { margin-bottom: 0; }
+.floor-time { font-size: .85rem; }
+.floor-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(135px, 100%), 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+.floor-metrics li { display: grid; gap: 3px; padding: 13px 15px; border-radius: 10px; background: var(--floor-bg); color: var(--floor-ink); }
+.floor-metrics strong { font-size: 1.55rem; }
+.floor-metrics span { font-size: .78rem; }
+.floor-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(155px, 100%), 1fr)); gap: 14px; }
+.floor-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: clamp(13px, 2vw, 24px); }
+.floor-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 13px; }
+.floor-heading span { color: var(--muted); font-size: .83rem; }
+.floor-rooms { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(138px, 100%), 1fr)); gap: 10px; }
+.floor-room { display: grid; align-content: start; gap: 4px; text-align: left; color: var(--ink); background: var(--floor-bg); border: 1px solid var(--border); border-top: 3px solid var(--floor-ink); border-radius: 8px; padding: 11px 12px; overflow-wrap: anywhere; }
+.floor-room:hover { border-color: var(--floor-ink); }
+.floor-room strong { font-size: 1.25rem; }
+.floor-type { font-size: .86rem; }
+.floor-state { color: var(--floor-ink); font-weight: 650; font-size: .75rem; }
+.floor-room small { font-size: .74rem; }
+.floor-map [data-state="AVAILABLE"] { --floor-bg: #eaf4ed; --floor-ink: #246249; }
+.floor-map [data-state="ASSIGNED"] { --floor-bg: #e9f0fa; --floor-ink: #294e81; }
+.floor-map [data-state="HELD"] { --floor-bg: #fcf1d4; --floor-ink: #6b4d13; }
+.floor-map [data-state="BLOCKED"], .floor-map [data-state="OUT_OF_SERVICE"] { --floor-bg: #faeaea; --floor-ink: #893e3a; }
+.dialog.floor-drawer { inset: 0 0 0 auto; margin: 0; height: 100dvh; max-height: 100dvh; width: min(440px, 100%); max-width: 100%; border-radius: 12px 0 0 12px; }
+.floor-detail { display: grid; gap: 18px; overflow-wrap: anywhere; }
+.floor-detail dl { display: grid; gap: 5px 13px; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); }
+.floor-detail dt { color: var(--muted); }
+.floor-detail dd { margin: 0; }
+.floor-detail section { border-top: 1px solid var(--border); padding-top: 12px; }

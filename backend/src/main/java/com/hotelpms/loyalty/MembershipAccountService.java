@@ -33,7 +33,8 @@ public class MembershipAccountService {
             case VIP -> LoyaltyTier.DIAMOND;
             case DIAMOND -> null;
         };
-        BigDecimal threshold = nextTier == null ? null : new BigDecimal(nextTier == LoyaltyTier.VIP ? "10000000.00" : "30000000.00");
+        BigDecimal threshold = nextTier == null ? null
+                : nextTier == LoyaltyTier.VIP ? LoyaltyService.VIP_THRESHOLD : LoyaltyService.DIAMOND_THRESHOLD;
         BigDecimal remaining = threshold == null ? BigDecimal.ZERO : threshold.subtract(profile.getEligibleSpendTotal()).max(BigDecimal.ZERO);
         return new MembershipSummary(tier, profile.getEligibleSpendTotal(), profile.getPointsBalance(),
                 rules.getDiscountRate(tier), nextTier, threshold, remaining);

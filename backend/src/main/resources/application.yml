@@ -23,6 +23,29 @@ management:
       exposure:
         include: health
 app:
+  support:
+    ai:
+      enabled: ${AI_ENABLED:false}
+      provider: ${AI_PROVIDER:openai-compatible}
+      api-key: ${AI_API_KEY:}
+      model: ${AI_MODEL:}
+      base-url: ${AI_BASE_URL:https://api.openai.com/v1}
+      request-timeout: ${AI_REQUEST_TIMEOUT:12s}
+      max-output-tokens: ${AI_MAX_OUTPUT_TOKENS:400}
+      max-conversation-context: ${AI_MAX_CONVERSATION_CONTEXT:6}
+  room-images:
+    max-bytes: ${ROOM_IMAGE_MAX_BYTES:5242880}
+  payment:
+    demo-enabled: false
+  vnpay:
+    enabled: ${VNPAY_ENABLED:false}
+    tmn-code: ${VNPAY_TMN_CODE:}
+    hash-secret: ${VNPAY_HASH_SECRET:}
+    payment-url: ${VNPAY_PAYMENT_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+    return-url: ${VNPAY_RETURN_URL:http://localhost:5173/payment-return}
+    ipn-url: ${VNPAY_IPN_URL:}
+  check-in:
+    days-before-arrival: ${CHECK_IN_DAYS_BEFORE_ARRIVAL:3}
   jwt:
     secret: ${JWT_SECRET:}
     issuer: hotel-pms-api

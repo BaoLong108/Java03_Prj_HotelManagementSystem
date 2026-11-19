@@ -23,7 +23,7 @@ public interface RoomTypeRepository extends JpaRepository<RoomType, Long> {
             SELECT new com.hotelpms.room.dto.RoomTypeResponse(
                 rt.id, rt.code, rt.name, rt.description,
                 CAST(rt.maxOccupancy AS int), rt.basePricePerNight,
-                SUM(CASE WHEN p.active = true THEN 1L ELSE 0L END), rt.active
+                SUM(CASE WHEN p.active = true THEN 1L ELSE 0L END), rt.active, rt.amenities
             )
             FROM RoomType rt LEFT JOIN rt.physicalRooms p
             WHERE rt.active = true
@@ -37,7 +37,7 @@ public interface RoomTypeRepository extends JpaRepository<RoomType, Long> {
             SELECT new com.hotelpms.room.dto.RoomTypeResponse(
                 rt.id, rt.code, rt.name, rt.description,
                 CAST(rt.maxOccupancy AS int), rt.basePricePerNight,
-                SUM(CASE WHEN p.active = true THEN 1L ELSE 0L END), rt.active
+                SUM(CASE WHEN p.active = true THEN 1L ELSE 0L END), rt.active, rt.amenities
             )
             FROM RoomType rt LEFT JOIN rt.physicalRooms p
             WHERE rt.active = true AND rt.id = :id
@@ -50,7 +50,7 @@ public interface RoomTypeRepository extends JpaRepository<RoomType, Long> {
             SELECT new com.hotelpms.room.dto.RoomTypeResponse(
                 rt.id, rt.code, rt.name, rt.description,
                 CAST(rt.maxOccupancy AS int), rt.basePricePerNight,
-                SUM(CASE WHEN p.active = true THEN 1L ELSE 0L END), rt.active
+                SUM(CASE WHEN p.active = true THEN 1L ELSE 0L END), rt.active, rt.amenities
             )
             FROM RoomType rt LEFT JOIN rt.physicalRooms p
             GROUP BY rt.id, rt.code, rt.name, rt.description, rt.maxOccupancy, rt.basePricePerNight
@@ -66,7 +66,7 @@ public interface RoomTypeRepository extends JpaRepository<RoomType, Long> {
             SELECT new com.hotelpms.room.dto.RoomTypeResponse(
                 rt.id, rt.code, rt.name, rt.description,
                 CAST(rt.maxOccupancy AS int), rt.basePricePerNight,
-                SUM(CASE WHEN p.active = true THEN 1L ELSE 0L END), rt.active
+                SUM(CASE WHEN p.active = true THEN 1L ELSE 0L END), rt.active, rt.amenities
             )
             FROM RoomType rt LEFT JOIN rt.physicalRooms p
             WHERE rt.id = :id

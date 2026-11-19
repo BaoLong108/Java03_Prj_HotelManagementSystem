@@ -45,7 +45,7 @@ class QuoteServiceExtendedTest {
 
     @BeforeEach
     void setUp() {
-        quotes = new QuoteService(roomTypes, loyalty);
+        quotes = new QuoteService(roomTypes, loyalty, org.mockito.Mockito.mock(com.hotelpms.pricing.repository.RateRuleRepository.class));
     }
 
     // ---------------------------------------------------------------------

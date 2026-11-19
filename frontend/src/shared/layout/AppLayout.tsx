@@ -2,6 +2,7 @@ import { startTransition, useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../features/auth/AuthProvider'
 import { roleLabels } from '../../features/auth/types'
+import { CustomerSupportWidget } from '../../features/support/CustomerSupportWidget'
 import { Button, ConfirmDialog, Dialog, useToast } from '../ui'
 import { Icon } from '../ui/Icon'
 import type { IconName } from '../ui/Icon'
@@ -9,8 +10,11 @@ import type { IconName } from '../ui/Icon'
 const titles: Record<string, string> = {
   '/': 'Một khoảng nghỉ, thật riêng', '/rooms': 'Phòng & không gian', '/booking': 'Đặt phòng', '/login': 'Đăng nhập',
   '/register': 'Tạo tài khoản', '/account': 'Tài khoản', '/my-bookings': 'Kỳ nghỉ của tôi',
+  '/account/transactions': 'Lịch sử giao dịch',
   '/staff': 'Tổng quan vận hành', '/staff/bookings': 'Tra cứu booking', '/staff/calendar': 'Lịch phòng',
-  '/staff/rooms': 'Tình trạng phòng', '/admin': 'Quản trị khách sạn', '/admin/rooms': 'Danh mục phòng',
+  '/staff/rooms': 'Sơ đồ tầng', '/admin': 'Quản trị khách sạn', '/admin/rooms': 'Danh mục phòng', '/admin/rate-calendar': 'Lịch giá phòng',
+  '/staff/check-in-requests': 'Yêu cầu nhận phòng', '/admin/analytics': 'Phân tích doanh thu',
+  '/staff/support': 'Hỗ trợ khách hàng', '/admin/support/faq': 'FAQ và chính sách khách sạn',
   '/admin/members': 'Thành viên & chính sách', '/admin/settings': 'Cài đặt', '/ui-kit': 'Thư viện giao diện', '/403': 'Không đủ quyền',
 }
 
@@ -23,7 +27,9 @@ export function RouteEffects() {
   const location = useLocation()
   const previous = useRef(location.pathname)
   useEffect(() => {
-    document.title = `${titles[location.pathname] ?? (location.pathname.startsWith('/rooms/') ? 'Chi tiết loại phòng' : 'Không tìm thấy trang')} · Hotel PMS`
+    const title = titles[location.pathname] ?? (location.pathname.startsWith('/admin/members/') ? 'Hồ sơ khách hàng' : location.pathname.startsWith('/rooms/') ? 'Chi tiết loại phòng' :
+      location.pathname.startsWith('/my-bookings/') ? 'Chi tiết kỳ nghỉ' : 'Không tìm thấy trang')
+    document.title = `${title} · Hotel PMS`
     if (location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView()
     else window.scrollTo(0, 0)
     if (previous.current !== location.pathname) document.getElementById('main-content')?.focus({ preventScroll: true })
@@ -50,7 +56,8 @@ export function AccountMenu() {
     <summary aria-label={`Tài khoản ${user.fullName}`}><span className="avatar">{user.fullName.slice(0, 1).toLocaleUpperCase('vi')}</span><span className="account-label">{user.fullName.split(' ').at(-1)}</span><Icon name="down" size={14} /></summary>
     <div className="account-dropdown"><strong>{user.fullName}</strong><p className="small muted">{user.roles.map((role) => roleLabels[role]).join(' · ')}</p>
       <Link to="/account"><Icon name="user" size={17} />Tài khoản của tôi</Link>
-      {user.roles.includes('CUSTOMER') && <Link to="/my-bookings"><Icon name="calendar" size={17} />Kỳ nghỉ của tôi</Link>}
+      {user.roles.includes('CUSTOMER') && <><Link to="/my-bookings"><Icon name="calendar" size={17} />Kỳ nghỉ của tôi</Link>
+        <Link to="/account/transactions"><Icon name="wallet" size={17} />Lịch sử giao dịch</Link></>}
       {user.roles.some((role) => role === 'STAFF' || role === 'ADMIN') && <Link to="/staff"><Icon name="grid" size={17} />Không gian quản lý</Link>}
       <button onClick={() => { details.current?.removeAttribute('open'); setConfirm(true) }}><Icon name="logout" size={17} />Đăng xuất</button>
     </div>
@@ -68,10 +75,11 @@ export function AppLayout() {
     <header className="guest-header"><div className="guest-header-inner"><Brand /><nav className="guest-nav" aria-label="Điều hướng chính">{links}</nav>
       <div className="header-actions"><AccountMenu /><Link className="button button--primary header-book" to="/rooms">Tìm phòng <Icon name="arrow" size={16} /></Link>
         <button className="icon-button mobile-only" aria-label="Mở menu" aria-haspopup="dialog" aria-controls="navigation-sidebar" aria-expanded={menu} onClick={() => setMenu(true)}><Icon name="menu" /></button></div></div></header>
-    <Dialog open={menu} onClose={() => setMenu(false)} title="Khám phá Hotel PMS"><nav id="navigation-sidebar" className="mobile-nav" aria-label="Điều hướng trên điện thoại">{links}<Link to="/booking">Đặt phòng</Link></nav></Dialog>
+    <Dialog open={menu} onClose={() => setMenu(false)} title="Khám phá Hotel PMS"><nav id="navigation-sidebar" className="mobile-nav" aria-label="Điều hướng trên điện thoại">{links}</nav></Dialog>
     <main id="main-content" className={`guest-main ${location.pathname === '/' ? 'guest-main--home' : ''}`} tabIndex={-1}><Outlet /></main>
+    <CustomerSupportWidget />
     <footer className="guest-footer"><div className="footer-main"><div><Brand /><p>Một khoảng nghỉ, thật riêng.<br />Một trải nghiệm, thật trọn vẹn.</p></div>
-      <div><h2>KHÁM PHÁ</h2><Link to="/rooms">Phòng & không gian</Link><Link to="/booking">Lên kế hoạch kỳ nghỉ</Link><Link to="/#membership">Đặc quyền thành viên</Link></div>
+      <div><h2>KHÁM PHÁ</h2><Link to="/rooms">Phòng & không gian</Link><Link to="/#membership">Đặc quyền thành viên</Link></div>
       <div><h2>TÀI KHOẢN</h2><Link to="/account">Thông tin cá nhân</Link><Link to="/my-bookings">Kỳ nghỉ của tôi</Link><Link to={user ? '/account' : '/register'}>{user ? 'Tài khoản của bạn' : 'Trở thành thành viên'}</Link></div>
       <div className="footer-note"><Icon name="leaf" size={30} /><p>Chậm lại một chút.<br />Tận hưởng nhiều hơn.</p></div></div>
       <div className="footer-bottom"><span>© {new Date().getFullYear()} Hotel PMS Mini · Nhóm 03</span><span>Đồ án khách sạn · Hình ảnh minh họa ý tưởng</span></div></footer>
@@ -81,9 +89,14 @@ export function AppLayout() {
 type NavItem = { to: string; label: string; icon: IconName; admin?: boolean }
 const workspaceNav: NavItem[] = [
   { to: '/staff', label: 'Tổng quan', icon: 'grid' }, { to: '/staff/bookings', label: 'Đặt phòng', icon: 'calendar' },
-  { to: '/staff/calendar', label: 'Lịch phòng', icon: 'clock' }, { to: '/staff/rooms', label: 'Tình trạng phòng', icon: 'bed' },
+  { to: '/staff/calendar', label: 'Lịch phòng', icon: 'clock' }, { to: '/staff/rooms', label: 'Sơ đồ tầng', icon: 'bed' },
+  { to: '/staff/check-in-requests', label: 'Yêu cầu nhận phòng', icon: 'key' },
+  { to: '/staff/support', label: 'Hỗ trợ khách hàng', icon: 'users' },
   { to: '/admin', label: 'Quản trị', icon: 'shield', admin: true }, { to: '/admin/rooms', label: 'Danh mục phòng', icon: 'building', admin: true },
+  { to: '/admin/rate-calendar', label: 'Lịch giá phòng', icon: 'calendar', admin: true },
+  { to: '/admin/analytics', label: 'Phân tích doanh thu', icon: 'chart', admin: true },
   { to: '/admin/members', label: 'Thành viên', icon: 'users', admin: true }, { to: '/admin/settings', label: 'Cài đặt', icon: 'settings', admin: true },
+  { to: '/admin/support/faq', label: 'FAQ và chính sách', icon: 'settings', admin: true },
 ]
 
 export function StaffLayout() {
@@ -100,7 +113,7 @@ export function StaffLayout() {
   return <div className={`workspace-shell ${collapsed ? 'workspace-shell--collapsed' : ''}`}><a href="#main-content" className="skip-link">Đến nội dung chính</a>
     <aside className="sidebar"><Brand workspace /><div className="property-label"><span className="property-tile"><Icon name="building" /></span><div><strong>Hotel PMS Mini</strong><small>Quản lý khách sạn</small></div></div><p className="nav-caption">KHÔNG GIAN LÀM VIỆC</p>{nav}
       <div className="sidebar-bottom"><Link to="/" className="sidebar-return"><Icon name="arrow" size={18} /><span>Về website khách sạn</span></Link><button className="collapse-button" onClick={() => setCollapsed(!collapsed)} aria-label={collapsed ? 'Mở rộng thanh điều hướng' : 'Thu gọn thanh điều hướng'} aria-expanded={!collapsed}><Icon name="panel" /><span>Thu gọn</span></button></div></aside>
-    <div className="workspace"><header className="workspace-header"><div className="breadcrumb"><button className="icon-button mobile-only" aria-label="Mở menu quản lý" onClick={() => setMobile(true)}><Icon name="menu" /></button><Link to="/staff" className="breadcrumb-root">Không gian quản lý</Link><span className="breadcrumb-slash">/</span><span>{titles[location.pathname] ?? 'Trang'}</span></div>
+    <div className="workspace"><header className="workspace-header"><div className="breadcrumb"><button className="icon-button mobile-only" aria-label="Mở menu quản lý" onClick={() => setMobile(true)}><Icon name="menu" /></button><Link to="/staff" className="breadcrumb-root">Không gian quản lý</Link><span className="breadcrumb-slash">/</span><span>{titles[location.pathname] ?? (location.pathname.startsWith('/admin/members/') ? 'Hồ sơ khách hàng' : 'Trang')}</span></div>
       <div className="header-actions"><button className="workspace-search" onClick={() => setSearchOpen(true)} aria-label="Tìm công cụ"><Icon name="search" size={17} /><span>Tìm công cụ…</span></button><AccountMenu /></div></header>
       <main id="main-content" className="main-content" tabIndex={-1}><Outlet /></main><footer className="workspace-footer"><span>HOTEL PMS MINI</span><span>Property workspace · Nhóm 03</span></footer></div>
     <Dialog open={mobile} title="Không gian quản lý" onClose={() => setMobile(false)}><div className="mobile-workspace-nav">{nav}<Link className="text-link" to="/">Về website khách sạn <Icon name="arrow" size={16} /></Link></div></Dialog>

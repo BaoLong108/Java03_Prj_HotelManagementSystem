@@ -20,6 +20,7 @@ const paths = {
   user: 'M20 21v-2a6 6 0 0 0-6-6h-4a6 6 0 0 0-6 6v2m12-14a4 4 0 1 1-8 0 4 4 0 0 1 8 0',
   shield: 'M12 3 3 7v5c0 5 9 9 9 9s9-4 9-9V7Zm-4 9 3 3 5-6',
   arrow: 'M4 12h16m-6-6 6 6-6 6',
+  download: 'M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4',
   chevron: 'm9 5 7 7-7 7',
   check: 'm5 12 4 4L19 6',
   close: 'm6 6 12 12M6 18 18 6',

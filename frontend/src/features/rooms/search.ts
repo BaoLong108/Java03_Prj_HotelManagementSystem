@@ -35,6 +35,25 @@ export function readStay(params: URLSearchParams, today = hotelToday()): StaySea
 export function stayParams(stay: StaySearch): string {
   return new URLSearchParams({ arrival: stay.arrival, departure: stay.departure, adults: String(stay.adults), children: String(stay.children) }).toString()
 }
+
+export function hasStayDates(params: URLSearchParams): boolean {
+  return params.has('arrival') || params.has('departure')
+}
+
+export function readRequestedStay(params: URLSearchParams): StaySearch {
+  const stay = readStay(params)
+  return { ...stay, arrival: params.get('arrival') ?? '', departure: params.get('departure') ?? '',
+    adults: Number(params.get('adults') ?? 2), children: Number(params.get('children') ?? 0) }
+}
+
+export function parseRoomTypeId(value: string | null | undefined): number | null {
+  const id = Number(value)
+  return value && /^[1-9]\d*$/.test(value) && Number.isSafeInteger(id) ? id : null
+}
+
+export function roomBookingPath(roomTypeId: number, stay: StaySearch): string {
+  return `/booking?${stayParams(stay)}&roomTypeId=${roomTypeId}`
+}
 export function displayDate(value: string) {
   if (!validDate(value)) return 'Chưa chọn'
   return new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${value}T00:00:00Z`))

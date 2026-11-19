@@ -18,17 +18,24 @@ public record RoomTypeResponse(
         long activeRoomCount,
         boolean active,
         String coverImageUrl,
-        java.util.List<RoomImageResponse> images
+        java.util.List<RoomImageResponse> images,
+        java.util.List<String> amenities
 ) {
     // JPQL projection: metadata is loaded separately without fetching image bytes.
     public RoomTypeResponse(Long id, String code, String name, String description, int maxOccupancy,
                             BigDecimal basePricePerNight, long activeRoomCount, boolean active) {
-        this(id, code, name, description, maxOccupancy, basePricePerNight, activeRoomCount, active, null, java.util.List.of());
+        this(id, code, name, description, maxOccupancy, basePricePerNight, activeRoomCount, active, null, java.util.List.of(), java.util.List.of());
+    }
+
+    public RoomTypeResponse(Long id, String code, String name, String description, int maxOccupancy,
+                           BigDecimal price, long count, boolean active, String[] amenities) {
+        this(id, code, name, description, maxOccupancy, price, count, active, null,
+                java.util.List.of(), amenities == null ? java.util.List.of() : java.util.List.of(amenities));
     }
 
     public RoomTypeResponse withImages(java.util.List<RoomImageResponse> gallery) {
         return new RoomTypeResponse(id, code, name, description, maxOccupancy, basePricePerNight,
                 activeRoomCount, active, gallery.stream().filter(RoomImageResponse::cover).map(RoomImageResponse::url)
-                .findFirst().orElse(null), java.util.List.copyOf(gallery));
+                .findFirst().orElse(null), java.util.List.copyOf(gallery), amenities);
     }
 }

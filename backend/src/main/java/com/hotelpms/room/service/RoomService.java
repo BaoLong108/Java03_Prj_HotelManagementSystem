@@ -62,6 +62,7 @@ public class RoomService {
                 req.maxOccupancy(),
                 req.basePricePerNight()
         );
+        rt.setAmenities(req.amenities());
         roomTypes.save(rt);
         // Dung findByIdWithRoomCount (ke ca inactive) thay vi findActiveByIdWithRoomCount
         // vi RoomType moi tao co the chua duoc flush vao query active
@@ -84,13 +85,14 @@ public class RoomService {
         rt.setDescription(req.description());
         rt.setMaxOccupancy(req.maxOccupancy());
         rt.setBasePricePerNight(req.basePricePerNight());
+        if (req.amenities() != null) rt.setAmenities(req.amenities());
         roomTypes.saveAndFlush(rt); // flush de JPQL query ben duoi thay du lieu moi nhat
         return enrich(java.util.List.of(roomTypes.findByIdWithRoomCount(id).orElseThrow())).getFirst();
     }
 
     @Transactional
     public void deactivateRoomType(Long id) {
-        RoomType rt = roomTypes.findById(id)
+        RoomType rt = roomTypes.lockById(id)
                 .orElseThrow(() -> new ApiException(
                         HttpStatus.NOT_FOUND, "ROOM_TYPE_NOT_FOUND", "Loai phong khong ton tai"));
 
@@ -125,7 +127,7 @@ public class RoomService {
 
     @Transactional
     public PhysicalRoomResponse createPhysicalRoom(CreatePhysicalRoomRequest req) {
-        RoomType rt = roomTypes.findById(req.roomTypeId())
+        RoomType rt = roomTypes.lockById(req.roomTypeId())
                 .filter(RoomType::isActive)
                 .orElseThrow(() -> new ApiException(
                         HttpStatus.NOT_FOUND, "ROOM_TYPE_NOT_FOUND",
@@ -137,15 +139,14 @@ public class RoomService {
         }
 
         PhysicalRoom room = new PhysicalRoom(rt, req.roomNumber().strip(), req.floorNumber());
+        room.setActive(!Boolean.FALSE.equals(req.active()));
         physicalRooms.saveAndFlush(room);
         return PhysicalRoomResponse.from(room);
     }
 
     @Transactional
     public PhysicalRoomResponse updatePhysicalRoom(Long id, UpdatePhysicalRoomRequest req) {
-        PhysicalRoom room = physicalRooms.findById(id)
-                .orElseThrow(() -> new ApiException(
-                        HttpStatus.NOT_FOUND, "PHYSICAL_ROOM_NOT_FOUND", "Phong khong ton tai"));
+        PhysicalRoom room = lockInventoryRoom(id);
 
         if (physicalRooms.existsByRoomNumberIgnoreCaseAndIdNot(req.roomNumber().strip(), id)) {
             throw new ApiException(HttpStatus.CONFLICT, "ROOM_NUMBER_DUPLICATE",
@@ -162,8 +163,6 @@ public class RoomService {
     public PhysicalRoomResponse createPhysicalRoomWithImages(CreatePhysicalRoomRequest req,
             List<org.springframework.web.multipart.MultipartFile> files, int coverIndex, boolean replaceGallery) {
         var validated = images.validate(files, coverIndex);
-        roomTypes.lockById(req.roomTypeId()).filter(RoomType::isActive)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "ROOM_TYPE_NOT_FOUND", "Hạng phòng không tồn tại hoặc đã ẩn"));
         PhysicalRoomResponse created = createPhysicalRoom(req);
         images.replace(req.roomTypeId(), validated, coverIndex, replaceGallery);
         return created;
@@ -176,9 +175,7 @@ public class RoomService {
 
     @Transactional
     public void deactivatePhysicalRoom(Long id) {
-        PhysicalRoom room = physicalRooms.findById(id)
-                .orElseThrow(() -> new ApiException(
-                        HttpStatus.NOT_FOUND, "PHYSICAL_ROOM_NOT_FOUND", "Phong khong ton tai"));
+        PhysicalRoom room = lockInventoryRoom(id);
 
         // Khong cho an phong dang co booking active -- bao toan du lieu booking
         if (physicalRooms.hasActiveBookings(id)) {
@@ -188,5 +185,15 @@ public class RoomService {
 
         room.setActive(false);
         physicalRooms.save(room);
+    }
+
+    private PhysicalRoom lockInventoryRoom(Long id) {
+        Long typeId = physicalRooms.findRoomTypeId(id).orElseThrow(RoomService::physicalRoomNotFound);
+        roomTypes.lockById(typeId).orElseThrow(RoomService::physicalRoomNotFound);
+        return physicalRooms.lockById(id).orElseThrow(RoomService::physicalRoomNotFound);
+    }
+
+    private static ApiException physicalRoomNotFound() {
+        return new ApiException(HttpStatus.NOT_FOUND, "PHYSICAL_ROOM_NOT_FOUND", "Không tìm thấy phòng");
     }
 }

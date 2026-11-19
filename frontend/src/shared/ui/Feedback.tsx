@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useId, useRef, useSt
 import type { ReactNode } from 'react'
 import { Icon } from './Icon'
 
-export function Dialog({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
+export function Dialog({ open, onClose, title, children, className = '' }: { open: boolean; onClose: () => void; title: string; children: ReactNode; className?: string }) {
   const ref = useRef<HTMLDialogElement>(null)
   const titleId = useId()
   useEffect(() => {
@@ -14,7 +14,7 @@ export function Dialog({ open, onClose, title, children }: { open: boolean; onCl
     document.body.style.overflow = 'hidden'
     return () => { dialog.close(); document.body.style.overflow = overflow; previouslyFocused?.focus() }
   }, [open])
-  return <dialog ref={ref} className="dialog" aria-labelledby={titleId} onCancel={(event) => { event.preventDefault(); onClose() }}
+  return <dialog ref={ref} className={`dialog ${className}`} aria-labelledby={titleId} onCancel={(event) => { event.preventDefault(); onClose() }}
     onClick={(event) => { if (event.target === event.currentTarget) { const rect = event.currentTarget.getBoundingClientRect(); if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) onClose() } }}>
     <div className="dialog-heading"><h2 id={titleId}>{title}</h2><button type="button" className="icon-button" aria-label="Đóng hộp thoại" onClick={onClose}><Icon name="close" /></button></div>{children}
   </dialog>

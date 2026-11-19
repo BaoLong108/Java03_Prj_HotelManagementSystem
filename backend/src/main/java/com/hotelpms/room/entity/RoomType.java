@@ -57,6 +57,10 @@ public class RoomType extends AuditedEntity {
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.ARRAY)
+    @Column(nullable = false, columnDefinition = "text[]")
+    private String[] amenities = new String[0];
+
     @OneToMany(mappedBy = "roomType", fetch = FetchType.LAZY)
     private List<PhysicalRoom> physicalRooms = new ArrayList<>();
 
@@ -78,6 +82,11 @@ public class RoomType extends AuditedEntity {
     public short getMaxOccupancy() { return maxOccupancy; }
     public BigDecimal getBasePricePerNight() { return basePricePerNight; }
     public boolean isActive() { return active; }
+    public String[] getAmenities() { return amenities.clone(); }
+    public void setAmenities(List<String> values) {
+        amenities = values == null ? new String[0] : values.stream().map(String::strip)
+                .filter(value -> !value.isEmpty()).distinct().toArray(String[]::new);
+    }
     public List<PhysicalRoom> getPhysicalRooms() { return Collections.unmodifiableList(physicalRooms); }
 
     public void setName(String name) { this.name = name; }

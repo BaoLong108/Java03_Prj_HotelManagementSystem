@@ -35,21 +35,26 @@ export type RoomType = {
   id: number
   code: string
   name: string
-  description?: string
+  description?: string | null
   maxOccupancy: number
   basePricePerNight: number
   imageUrl?: string
   coverImageUrl?: string | null
+  availableRoomCount?: number
+  amenities?: string[]
 }
 
 export type PriceQuote = {
   roomType: RoomType
   nights: number
   guestCount: number
+  basePricePerNight?: number
   baseAmount: number
   discountRate: number
   discountAmount: number
   payableAmount: number
+  nightlyRates?: { date: string; nightlyRate: number }[]
+  nightlyBreakdownTruncated?: boolean
 }
 
 export const bookingStatusLabels: Record<BookingStatus, string> = {

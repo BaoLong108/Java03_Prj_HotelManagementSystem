@@ -63,6 +63,7 @@ class RoomImageIntegrationTest {
     @Autowired ObjectMapper json;
     @Autowired JwtService jwt;
     @Autowired UserRepository users;
+    @Autowired com.hotelpms.room.service.RoomImageService images;
     @BeforeEach void prepare() {
         jdbc.update("DELETE FROM bookings WHERE customer_id=?", CUSTOMER);
         jdbc.update("DELETE FROM room_type_images WHERE room_type_id IN (?,?)", TYPE, OTHER_TYPE);
@@ -82,6 +83,111 @@ class RoomImageIntegrationTest {
         jdbc.update("INSERT INTO customer_profiles(user_id) VALUES(?) ON CONFLICT DO NOTHING", CUSTOMER);
     }
     private String token(long id) { return "Bearer " + jwt.issue(users.findById(id).orElseThrow()).accessToken(); }
+    private String revision() {
+        return images.metadata(List.of(TYPE)).getOrDefault(TYPE, List.of()).stream()
+                .map(image -> image.id() + ":" + image.sortOrder() + ":" + image.cover()).collect(java.util.stream.Collectors.joining("|"));
+    }
+    private MockMultipartHttpServletRequestBuilder edit(java.util.Map<String,Object> body) throws IOException {
+        return multipart(org.springframework.http.HttpMethod.PUT, "/api/v1/admin/rooms/types/" + TYPE + "/images")
+                .file(new MockMultipartFile("gallery", "gallery.json", "application/json", json.writeValueAsBytes(body)));
+    }
+    @Test void gallerySupportsRetainAppendReplaceDeleteCoverAndOrderWithoutChangingInventory() throws Exception {
+        mvc.perform(request(TYPE, "MANAGE-1", 2, 0).header("Authorization", token(ADMIN))).andExpect(status().isCreated());
+        var before = images.metadata(List.of(TYPE)).get(TYPE); long retained = before.get(1).id(); long removed = before.get(0).id();
+        var body = java.util.Map.<String,Object>of("items", List.of(java.util.Map.of("imageId", retained), java.util.Map.of("uploadIndex",0)), "coverIndex",1,"expectedRevision",revision());
+        mvc.perform(edit(body).file(new MockMultipartFile("images", "new.png", "image/png", png())).header("Authorization",token(ADMIN)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].id").value(retained)).andExpect(jsonPath("$[1].cover").value(true));
+        var after = images.metadata(List.of(TYPE)).get(TYPE);
+        assertThat(after).hasSize(2); assertThat(after.getFirst().id()).isEqualTo(retained);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM physical_rooms WHERE room_type_id=?",Integer.class,TYPE)).isEqualTo(1);
+        mvc.perform(get("/api/v1/rooms/"+TYPE)).andExpect(jsonPath("$.coverImageUrl").value(after.get(1).url()));
+        mvc.perform(get(after.get(1).url()).param("size","thumb")).andExpect(status().isOk()).andExpect(content().contentType("image/jpeg"));
+        mvc.perform(get("/api/v1/rooms/"+TYPE+"/images/"+removed)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/rooms/"+TYPE+"/images/"+retained)).andExpect(status().isOk());
+        var reorder = java.util.Map.<String,Object>of("items", List.of(java.util.Map.of("imageId", after.get(1).id()), java.util.Map.of("imageId", retained)),"coverIndex",0,"expectedRevision",revision());
+        mvc.perform(edit(reorder).header("Authorization",token(ADMIN))).andExpect(status().isOk()).andExpect(jsonPath("$[0].cover").value(true));
+    }
+    @Test void galleryRejectsStaleEditsInvalidOwnershipAndUnauthorisedWriters() throws Exception {
+        mvc.perform(request(TYPE,"EDIT-ONE",1,0).header("Authorization",token(ADMIN))).andExpect(status().isCreated());
+        long id=images.metadata(List.of(TYPE)).get(TYPE).getFirst().id();
+        var valid=java.util.Map.<String,Object>of("items",List.of(java.util.Map.of("imageId",id)),"coverIndex",0,"expectedRevision",revision());
+        for(long actor:new long[]{STAFF,CUSTOMER}) mvc.perform(edit(valid).header("Authorization",token(actor))).andExpect(status().isForbidden());
+        mvc.perform(edit(valid)).andExpect(status().isUnauthorized());
+        var stale=java.util.Map.<String,Object>of("items",List.of(java.util.Map.of("imageId",id)),"coverIndex",0,"expectedRevision","outdated");
+        mvc.perform(edit(stale).header("Authorization",token(ADMIN))).andExpect(status().isConflict());
+        var foreign=java.util.Map.<String,Object>of("items",List.of(java.util.Map.of("imageId",Long.MAX_VALUE)),"coverIndex",0,"expectedRevision",revision());
+        mvc.perform(edit(foreign).header("Authorization",token(ADMIN))).andExpect(status().isBadRequest());
+        assertThat(images.metadata(List.of(TYPE)).get(TYPE).getFirst().id()).isEqualTo(id);
+    }
+
+    @Test void simultaneousGalleryEditsAcceptExactlyOneRevision() throws Exception {
+        mvc.perform(request(TYPE, "EDIT-RACE", 3, 0).header("Authorization", token(ADMIN))).andExpect(status().isCreated());
+        var original = images.metadata(List.of(TYPE)).get(TYPE);
+        var items = original.stream().map(image -> java.util.Map.of("imageId", image.id())).toList();
+        String revision = revision();
+        String auth = token(ADMIN);
+        var start = new CountDownLatch(1);
+        var first = CompletableFuture.supplyAsync(() -> editCover(items, revision, 1, auth, start));
+        var second = CompletableFuture.supplyAsync(() -> editCover(items, revision, 2, auth, start));
+        start.countDown();
+        assertThat(List.of(first.get(20, TimeUnit.SECONDS), second.get(20, TimeUnit.SECONDS))).containsExactlyInAnyOrder(200, 409);
+        var gallery = images.metadata(List.of(TYPE)).get(TYPE);
+        assertThat(gallery).extracting(com.hotelpms.room.dto.RoomImageResponse::id)
+                .containsExactlyElementsOf(original.stream().map(com.hotelpms.room.dto.RoomImageResponse::id).toList());
+        assertThat(gallery.stream().filter(com.hotelpms.room.dto.RoomImageResponse::cover).toList()).hasSize(1);
+        assertThat(gallery.getFirst().cover()).isFalse();
+    }
+
+    private int editCover(List<java.util.Map<String, Long>> items, String revision, int coverIndex, String auth, CountDownLatch start) {
+        try {
+            start.await();
+            var body = java.util.Map.<String,Object>of("items", items, "coverIndex", coverIndex, "expectedRevision", revision);
+            return mvc.perform(edit(body).header("Authorization", auth)).andReturn().getResponse().getStatus();
+        } catch (Exception e) { throw new java.util.concurrent.CompletionException(e); }
+    }
+    @Test void invalidGalleryUploadRollsBackAndPreservesExistingCover() throws Exception {
+        mvc.perform(request(TYPE,"EDIT-BAD",1,0).header("Authorization",token(ADMIN))).andExpect(status().isCreated());
+        String original=revision();
+        var body=java.util.Map.<String,Object>of("items",List.of(java.util.Map.of("uploadIndex",0)),"coverIndex",0,"expectedRevision",original);
+        mvc.perform(edit(body).file(new MockMultipartFile("images","fake.png","image/png","<script>bad</script>".getBytes()))
+                .header("Authorization",token(ADMIN))).andExpect(status().isBadRequest());
+        assertThat(revision()).isEqualTo(original);
+    }
+
+    @Test void physicalRoomsCanBeCreatedWithoutImagesAndShareTheTypeGallery() throws Exception {
+        String roomPath = "/api/v1/admin/rooms/physical";
+        byte[] room = json.writeValueAsBytes(java.util.Map.of("roomTypeId", TYPE, "roomNumber", "NO-IMAGE", "floorNumber", 3));
+        mvc.perform(post(roomPath).contentType("application/json").content(room).header("Authorization", token(STAFF)))
+                .andExpect(status().isForbidden());
+        mvc.perform(post(roomPath).contentType("application/json").content(room).header("Authorization", token(ADMIN)))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.active").value(true));
+        mvc.perform(get("/api/v1/rooms/" + TYPE)).andExpect(jsonPath("$.images").isEmpty());
+
+        var upload = java.util.Map.<String,Object>of("items", List.of(java.util.Map.of("uploadIndex", 0)), "coverIndex", 0, "expectedRevision", "");
+        mvc.perform(edit(upload).file(new MockMultipartFile("images", "new.png", "image/png", png())).header("Authorization", token(ADMIN)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].cover").value(true));
+        String revisionAfterUpload = revision();
+        byte[] hidden = json.writeValueAsBytes(java.util.Map.of("roomTypeId", TYPE, "roomNumber", "SHARED-IMAGE", "floorNumber", 3, "active", false));
+        mvc.perform(post(roomPath).contentType("application/json").content(hidden).header("Authorization", token(ADMIN)))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.active").value(false));
+        assertThat(revision()).isEqualTo(revisionAfterUpload);
+
+        var clear = java.util.Map.<String,Object>of("items", List.of(), "coverIndex", -1, "expectedRevision", revisionAfterUpload);
+        mvc.perform(edit(clear).header("Authorization", token(ADMIN))).andExpect(status().isOk()).andExpect(jsonPath("$").isEmpty());
+        mvc.perform(get("/api/v1/rooms/" + TYPE)).andExpect(jsonPath("$.images").isEmpty());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM physical_rooms WHERE room_type_id=?", Integer.class, TYPE)).isEqualTo(2);
+    }
+    @Test void amenitiesRoundTripFromAdminToPublicWithoutInventingDefaults() throws Exception {
+        mvc.perform(put("/api/v1/admin/rooms/types/"+TYPE).header("Authorization",token(ADMIN)).contentType("application/json")
+                .content(json.writeValueAsBytes(java.util.Map.of("code","GALLERY_"+TYPE,"name","Gallery Test","maxOccupancy",2,
+                        "basePricePerNight",950000,"amenities",List.of("Wi-Fi","Ban công")))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.amenities[0]").value("Wi-Fi"));
+        mvc.perform(get("/api/v1/rooms/"+TYPE)).andExpect(status().isOk()).andExpect(jsonPath("$.amenities[1]").value("Ban công"));
+        // Legacy price-only edits preserve stored amenities when the optional field is absent.
+        mvc.perform(put("/api/v1/admin/rooms/types/"+TYPE).header("Authorization",token(ADMIN)).contentType("application/json")
+                .content(json.writeValueAsBytes(java.util.Map.of("code","GALLERY_"+TYPE,"name","Gallery Test","maxOccupancy",2,"basePricePerNight",960000))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.amenities.length()").value(2));
+    }
     private static byte[] png() throws IOException {
         var output = new ByteArrayOutputStream(); ImageIO.write(new BufferedImage(20, 12, BufferedImage.TYPE_INT_RGB), "png", output); return output.toByteArray();
     }
@@ -97,7 +203,7 @@ class RoomImageIntegrationTest {
         mvc.perform(request(TYPE, " IMG-101 ", 5, 3).header("Authorization", token(ADMIN)))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.roomNumber").value("IMG-101"));
         var result = mvc.perform(get("/api/v1/rooms/" + TYPE)).andExpect(status().isOk())
-                .andExpect(jsonPath("$.images.length()").value(5)).andExpect(jsonPath("$.images[0].cover").value(true))
+                .andExpect(jsonPath("$.images.length()").value(5)).andExpect(jsonPath("$.images[3].cover").value(true))
                 .andExpect(jsonPath("$.basePricePerNight").value(950000)).andReturn();
         var body = json.readTree(result.getResponse().getContentAsString());
         String url = body.get("coverImageUrl").asText();

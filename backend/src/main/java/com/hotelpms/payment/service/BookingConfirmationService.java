@@ -24,7 +24,7 @@ public class BookingConfirmationService {
   var payment=payments.findFirstByBookingIdAndStatusOrderByCreatedAtDesc(booking.id(),PaymentStatus.SUCCEEDED)
    .orElseThrow(()->new ApiException(HttpStatus.CONFLICT,"PAYMENT_REQUIRED","Chưa có thanh toán thành công"));
   var time=DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneId.of("Asia/Ho_Chi_Minh"));
-  List<String> lines=List.of("HOTEL PMS - BOOKING CONFIRMATION","Demo confirmation - not a tax invoice",
+  List<String> lines=List.of("HOTEL PMS - BOOKING CONFIRMATION","Booking confirmation - not a tax invoice",
    "Booking: "+booking.bookingCode(),"Status: "+booking.status(),"Arrival: "+time.format(booking.startAt())+" (UTC+07)",
    "Departure: "+time.format(booking.endAt())+" (UTC+07)","Guests: "+booking.guestCount(),
    "Base amount: "+booking.baseAmount().toPlainString()+" VND",

@@ -29,6 +29,11 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     List<Booking> findByCustomerIdOrderByCreatedAtDesc(Long customerId);
 
+    List<Booking> findByCustomerIdOrderByCreatedAtDescIdDesc(Long customerId, org.springframework.data.domain.Pageable page);
+
+    List<Booking> findByCustomerIdAndStatusAndHoldExpiresAtAfterOrderByCreatedAtDescIdDesc(
+            Long customerId, BookingStatus status, Instant now, org.springframework.data.domain.Pageable page);
+
     List<Booking> findByStatusAndHoldExpiresAtBefore(BookingStatus status, Instant cutoff);
 
     List<Booking> findByStatusAndEndAtLessThanEqual(BookingStatus status, Instant cutoff);

@@ -1,0 +1,43 @@
+.rate-page { display: grid; gap: 16px; }
+.rate-page .page-heading { margin-bottom: 0; }
+.rate-toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; }
+.rate-toolbar > .field { flex: 1 1 210px; }
+.rate-month-nav { display: flex; align-items: end; gap: 8px; max-width: 100%; }
+.rate-month-nav .field { flex: 1 1 auto; }
+.rate-month-nav button { height: 46px; padding-inline: 13px; }
+.rate-base { display: grid; gap: 10px; }
+.rate-base-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+.rate-base-form .alert { flex: 1 0 100%; }
+.rate-base-form .field { flex: 0 1 220px; }
+.rate-workspace { display: grid; grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); align-items: start; gap: 16px; }
+.rate-grid-card, .rate-day-detail { padding: clamp(13px, 2vw, 24px); }
+.rate-grid-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.rate-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; margin-top: 14px; }
+.rate-weekday { color: var(--muted); font-size: .76rem; text-align: center; padding-bottom: 6px; }
+.rate-cell { display: grid; gap: 4px; align-content: start; min-height: 82px; background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: 7px; padding: 7px 6px; text-align: left; overflow-wrap: anywhere; }
+.rate-cell[data-weekend="true"] { background: #f7f2e6; }
+.rate-cell[data-kind="HOLIDAY"] { background: #f7edf7; }
+.rate-cell[data-kind="SEASONAL"] { background: #eaf3f8; }
+.rate-cell[data-kind="OVERRIDE"] { background: #eaf4ed; }
+.rate-cell[aria-pressed="true"] { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
+.rate-cell strong { font-size: .76rem; }
+.rate-cell small { color: #465961; font-size: .69rem; }
+.rate-day { font-size: .88rem; }
+.rate-mobile-weekday { display: none; }
+.rate-day-detail, .rate-form { display: grid; gap: 12px; }
+.rate-form { border-top: 1px solid var(--border); padding-top: 16px; }
+.rate-range { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(140px, 100%), 1fr)); gap: 9px; }
+.rate-rule-list, .rate-preview ul { margin: 0; padding: 0; list-style: none; }
+.rate-rule-list li, .rate-preview li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; padding: 7px 0; border-top: 1px solid var(--border); font-size: .8rem; }
+.rate-rule-list button { min-height: 34px; padding: 4px 9px; }
+.rate-preview summary { cursor: pointer; font-size: .85rem; font-weight: 600; margin-bottom: 8px; }
+.rate-preview ul { max-height: 200px; overflow-y: auto; }
+
+@media (max-width: 1220px) {
+  .rate-workspace { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 620px) {
+  .rate-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .rate-weekday, .rate-padding { display: none; }
+  .rate-mobile-weekday { display: inline; }
+}

@@ -7,8 +7,9 @@ const params = (body: CreateBookingRequest) => new URLSearchParams({
 export const bookingApi = {
   applyVoucher: (code: string, voucherCode: string, signal?: AbortSignal) => apiRequest<BookingResponse>(`/api/v1/bookings/${encodeURIComponent(code)}/voucher`, { method: 'POST', body: { code: voucherCode }, signal }),
   removeVoucher: (code: string, signal?: AbortSignal) => apiRequest<BookingResponse>(`/api/v1/bookings/${encodeURIComponent(code)}/voucher`, { method: 'DELETE', signal }),
-  downloadConfirmation: async (code: string) => {
-    const blob = await apiRequest<Blob>(`/api/v1/bookings/${encodeURIComponent(code)}/confirmation.pdf`, { responseType: 'blob' })
+  downloadConfirmation: async (code: string, transactionId?: number) => {
+    const query = transactionId === undefined ? '' : `?transactionId=${transactionId}`
+    const blob = await apiRequest<Blob>(`/api/v1/bookings/${encodeURIComponent(code)}/confirmation.pdf${query}`, { responseType: 'blob' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url; link.download = `booking-${code}.pdf`; link.click()
@@ -18,16 +19,17 @@ export const bookingApi = {
   getByCode: (code: string, signal?: AbortSignal) => apiRequest<BookingResponse>(`/api/v1/bookings/${encodeURIComponent(code)}`, { signal }),
   getMyBookings: (signal?: AbortSignal) => apiRequest<BookingResponse[]>('/api/v1/bookings', { signal }),
   cancel: (code: string) => apiRequest<BookingResponse>(`/api/v1/bookings/${encodeURIComponent(code)}/cancel`, { method: 'POST' }),
-  confirm: async (code: string): Promise<BookingResponse> => {
-    await apiRequest('/api/v1/payments/demo', { method: 'POST', body: { bookingCode: code, idempotencyKey: `web-demo-${code}` } })
+  settleZero: async (code: string): Promise<BookingResponse> => {
+    await apiRequest('/api/v1/payments/zero', { method: 'POST', body: { bookingCode: code } })
     return bookingApi.getByCode(code)
   },
   getRoomTypes: (signal?: AbortSignal) => apiRequest<RoomType[]>('/api/v1/rooms', { signal, auth: false }),
   search: (body: CreateBookingRequest, signal?: AbortSignal) =>
     apiRequest<RoomType[]>(`/api/v1/rooms/availability?${params(body)}`, { signal, auth: false }),
   quote: async (room: RoomType, body: CreateBookingRequest, signal?: AbortSignal): Promise<PriceQuote & { appliedTier: string }> => {
-    const result = await apiRequest<Omit<PriceQuote, 'roomType' | 'guestCount'> & { appliedTier: string }>(
+    const result = await apiRequest<Omit<PriceQuote, 'roomType' | 'guestCount'> & { roomTypeId: number; appliedTier: string }>(
       `/api/v1/pricing/quote?${params(body)}`, { signal })
+    if (result.roomTypeId !== room.id || body.roomTypeId !== room.id) throw new Error('Báo giá không khớp hạng phòng đã chọn.')
     return { ...result, roomType: room, guestCount: body.guestCount }
   },
 }

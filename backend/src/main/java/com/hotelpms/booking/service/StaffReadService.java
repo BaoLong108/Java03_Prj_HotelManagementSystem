@@ -1,5 +1,8 @@
 package com.hotelpms.booking.service;
+import com.hotelpms.booking.dto.FloorOverview;
+import com.hotelpms.booking.entity.BookingStatus;
 import com.hotelpms.shared.api.ApiException;
+import java.sql.Timestamp;
 import java.time.*;
 import java.util.*;
 import org.springframework.http.HttpStatus;
@@ -11,6 +14,54 @@ import org.springframework.transaction.annotation.Transactional;
 public class StaffReadService {
  private final JdbcTemplate jdbc;
  public StaffReadService(JdbcTemplate jdbc){this.jdbc=jdbc;}
+
+ public FloorOverview floorOverview(Instant asOf) {
+  var byFloor = new LinkedHashMap<Integer, List<FloorOverview.Room>>();
+  jdbc.query("""
+      SELECT r.id, r.room_number, r.floor_number, r.room_type_id, t.name, r.updated_at,
+             (r.is_active AND t.is_active) AS sellable,
+             x.id AS block_id, x.start_at AS block_start, x.end_at AS block_end, x.reason,
+             b.booking_code, b.status AS booking_status, b.start_at AS booking_start, b.end_at AS booking_end
+      FROM physical_rooms r
+      JOIN room_types t ON t.id = r.room_type_id
+      CROSS JOIN (SELECT ?::timestamptz AS at) point
+      LEFT JOIN LATERAL (
+          SELECT id, start_at, end_at, reason FROM room_blocks
+          WHERE physical_room_id = r.id AND released_at IS NULL
+            AND start_at <= point.at AND end_at > point.at
+          ORDER BY start_at DESC, id DESC LIMIT 1
+      ) x ON true
+      LEFT JOIN LATERAL (
+          SELECT booking_code, status, start_at, end_at FROM bookings
+          WHERE physical_room_id = r.id AND start_at <= point.at AND end_at > point.at
+            AND (status = 'CONFIRMED' OR (status = 'PENDING_PAYMENT' AND hold_expires_at > point.at))
+          ORDER BY CASE WHEN status = 'CONFIRMED' THEN 0 ELSE 1 END, id DESC LIMIT 1
+      ) b ON true
+      ORDER BY r.floor_number NULLS LAST, r.room_number, r.id
+      """, rs -> {
+      Long blockId = rs.getObject("block_id", Long.class);
+      var block = blockId == null ? null : new FloorOverview.Block(blockId,
+              rs.getTimestamp("block_start").toInstant(), rs.getTimestamp("block_end").toInstant(), rs.getString("reason"));
+      String bookingStatus = rs.getString("booking_status");
+      var assignment = bookingStatus == null ? null : new FloorOverview.Assignment(rs.getString("booking_code"),
+              BookingStatus.valueOf(bookingStatus), rs.getTimestamp("booking_start").toInstant(),
+              rs.getTimestamp("booking_end").toInstant());
+      var state = operationalStatus(rs.getBoolean("sellable"), block, assignment);
+      var room = new FloorOverview.Room(rs.getLong("id"), rs.getString("room_number"), rs.getLong("room_type_id"),
+              rs.getString("name"), state, block, assignment, rs.getTimestamp("updated_at").toInstant());
+      byFloor.computeIfAbsent(rs.getObject("floor_number", Integer.class), floor -> new ArrayList<>()).add(room);
+  }, Timestamp.from(asOf));
+  return new FloorOverview(asOf, byFloor.entrySet().stream()
+          .map(entry -> new FloorOverview.Floor(entry.getKey(), List.copyOf(entry.getValue()))).toList());
+ }
+
+ private static FloorOverview.Status operationalStatus(boolean sellable, FloorOverview.Block block,
+                                                       FloorOverview.Assignment assignment) {
+  if (!sellable) return FloorOverview.Status.OUT_OF_SERVICE;
+  if (block != null) return FloorOverview.Status.BLOCKED;
+  if (assignment == null) return FloorOverview.Status.AVAILABLE;
+  return assignment.status() == BookingStatus.CONFIRMED ? FloorOverview.Status.ASSIGNED : FloorOverview.Status.HELD;
+ }
  public record CalendarRoom(Long physicalRoomId,String roomNumber,Integer floorNumber,Long roomTypeId,
   String roomTypeName,boolean isActive,List<Map<String,Object>> entries) {}
  public Map<String,Object> calendar(Instant from,Instant to,Long roomTypeId){

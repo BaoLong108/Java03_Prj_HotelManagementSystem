@@ -1,0 +1,31 @@
+.revenue-page, .revenue-kpis, .revenue-chart-grid { display: grid; gap: 1rem; min-width: 0; }
+.revenue-filter form { display: flex; flex-wrap: wrap; align-items: end; gap: .85rem; }
+.revenue-filter form > .field { flex: 1 1 10rem; min-width: 0; }
+.revenue-filter > p { margin: .85rem 0 0; }
+.revenue-kpis { grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); }
+.revenue-kpi { display: flex; flex-direction: column; gap: .55rem; min-width: 0; }
+.revenue-kpi h2, .revenue-kpi p { margin: 0; }
+.revenue-kpi h2 { font: inherit; font-weight: 650; }
+.revenue-kpi > strong { font-size: clamp(1.1rem, 2vw, 1.65rem); overflow-wrap: anywhere; }
+.revenue-kpi > small { color: #226864; }
+.revenue-chart-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.revenue-chart { min-width: 0; }
+.revenue-chart h2 { font-size: 1.15rem; margin: 0 0 .45rem; }
+.revenue-chart-empty { min-height: 7rem; display: grid; place-items: center; background: #f5f7f5; border-radius: .65rem; text-align: center; color: #526463; }
+.revenue-line { width: 100%; height: auto; overflow: visible; }
+.revenue-line text { fill: currentColor; font-size: 12px; }
+.revenue-line polyline { stroke: #226864; fill: none; stroke-width: 2.5; }
+.revenue-line circle { fill: #226864; }
+.revenue-grid-line { stroke: #dbe3df; }
+.revenue-values summary { cursor: pointer; }
+.revenue-values ul, .revenue-donut ul, .revenue-bars { list-style: none; margin: .7rem 0 0; padding: 0; display: grid; gap: .55rem; }
+.revenue-values li, .revenue-bars li > div { display: flex; justify-content: space-between; gap: .7rem; }
+.revenue-donut { display: grid; grid-template-columns: minmax(5rem, 8rem) 1fr; align-items: center; gap: .8rem; }
+.revenue-donut svg { width: 100%; }
+.revenue-donut svg text { font-weight: 700; fill: currentColor; }
+.revenue-donut li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .45rem; }
+.revenue-dot { border-radius: 50%; width: .65rem; height: .65rem; }
+.revenue-bar-track { display: block; height: .6rem; border-radius: 1rem; background: #e9efea; margin-top: .3rem; overflow: hidden; }
+.revenue-bar-track > span { display: block; height: 100%; background: #226864; border-radius: inherit; }
+@media (max-width: 900px) { .revenue-chart-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 430px) { .revenue-donut { grid-template-columns: 1fr; } .revenue-donut svg { max-width: 8rem; margin-inline: auto; } }

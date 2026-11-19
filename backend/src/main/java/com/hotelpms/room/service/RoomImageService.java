@@ -20,12 +20,16 @@ import org.springframework.web.multipart.MultipartFile;
 /** Images belong to a RoomType, matching the customer selection and pricing model. */
 @Service
 public class RoomImageService {
-    private static final int MAX_BYTES = 5 * 1024 * 1024;
+    private final int maxBytes;
     private final JdbcTemplate jdbc;
 
-    public RoomImageService(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    public RoomImageService(JdbcTemplate jdbc,
+            @org.springframework.beans.factory.annotation.Value("${app.room-images.max-bytes:5242880}") int maxBytes) {
+        if (maxBytes < 1 || maxBytes > 5242880) throw new IllegalArgumentException("Room image limit must be within the database's 5 MB ceiling");
+        this.jdbc = jdbc; this.maxBytes = maxBytes;
+    }
 
-    public record ValidatedImage(byte[] data, String contentType, int width, int height) { }
+    public record ValidatedImage(byte[] data, String contentType, int width, int height, byte[] thumbnail) { }
     public record ImageContent(byte[] data, String contentType) { }
 
     public List<ValidatedImage> validate(List<MultipartFile> files, int coverIndex) {
@@ -34,7 +38,7 @@ public class RoomImageService {
         }
         List<ValidatedImage> result = new ArrayList<>();
         for (MultipartFile file : files) {
-            if (file.isEmpty() || file.getSize() > MAX_BYTES) throw invalid("Mỗi ảnh phải từ 1 byte đến 5 MB");
+            if (file.isEmpty() || file.getSize() > maxBytes) throw invalid("Ảnh rỗng hoặc vượt giới hạn " + maxBytes / 1024 + " KB");
             try (var input = ImageIO.createImageInputStream(new ByteArrayInputStream(file.getBytes()))) {
                 var readers = ImageIO.getImageReaders(input);
                 if (!readers.hasNext()) throw invalid("Chỉ chấp nhận ảnh JPEG hoặc PNG hợp lệ");
@@ -50,8 +54,8 @@ public class RoomImageService {
                     BufferedImage image = reader.read(0);
                     var output = new ByteArrayOutputStream();
                     // Re-encode actual pixels: discard filenames, metadata and appended payloads.
-                    if (!ImageIO.write(image, format, output) || output.size() > MAX_BYTES) throw invalid("Ảnh sau xử lý vượt quá 5 MB");
-                    result.add(new ValidatedImage(output.toByteArray(), "image/" + format, width, height));
+                    if (!ImageIO.write(image, format, output) || output.size() > maxBytes) throw invalid("Ảnh sau xử lý vượt giới hạn dung lượng");
+                    result.add(new ValidatedImage(output.toByteArray(), "image/" + format, width, height, thumbnail(image)));
                 } finally { reader.dispose(); }
             } catch (IOException | IllegalArgumentException e) {
                 throw invalid("Không đọc được ảnh. Vui lòng chọn JPEG hoặc PNG hợp lệ");
@@ -70,9 +74,9 @@ public class RoomImageService {
         for (int i = 0; i < images.size(); i++) {
             var image = images.get(i);
             jdbc.update("""
-                INSERT INTO room_type_images(room_type_id,sort_order,is_cover,content_type,image_data,width,height)
-                VALUES (?,?,?,?,?,?,?)
-                """, typeId, i, i == coverIndex, image.contentType(), image.data(), image.width(), image.height());
+                INSERT INTO room_type_images(room_type_id,sort_order,is_cover,content_type,image_data,width,height,thumbnail_data,thumbnail_content_type)
+                VALUES (?,?,?,?,?,?,?,?, 'image/jpeg')
+                """, typeId, i, i == coverIndex, image.contentType(), image.data(), image.width(), image.height(), image.thumbnail());
         }
     }
 
@@ -82,7 +86,7 @@ public class RoomImageService {
         String placeholders = String.join(",", java.util.Collections.nCopies(ids.size(), "?"));
         Map<Long, List<RoomImageResponse>> result = new LinkedHashMap<>();
         jdbc.query("SELECT id,room_type_id,is_cover,sort_order,width,height FROM room_type_images WHERE room_type_id IN ("
-                + placeholders + ") ORDER BY room_type_id,is_cover DESC,sort_order", rs -> {
+                + placeholders + ") ORDER BY room_type_id,sort_order", rs -> {
             long typeId = rs.getLong("room_type_id"), id = rs.getLong("id");
             result.computeIfAbsent(typeId, ignored -> new ArrayList<>()).add(new RoomImageResponse(id,
                     "/api/v1/rooms/" + typeId + "/images/" + id, rs.getBoolean("is_cover"),
@@ -93,11 +97,37 @@ public class RoomImageService {
 
     @Transactional(readOnly = true)
     public ImageContent content(long typeId, long imageId) {
+        return content(typeId, imageId, false);
+    }
+
+    @Transactional(readOnly = true)
+    public ImageContent content(long typeId, long imageId, boolean small) {
         return jdbc.query("""
-            SELECT i.image_data,i.content_type FROM room_type_images i JOIN room_types t ON t.id=i.room_type_id
+            SELECT i.image_data,i.content_type,i.thumbnail_data,i.thumbnail_content_type FROM room_type_images i JOIN room_types t ON t.id=i.room_type_id
             WHERE i.room_type_id=? AND i.id=? AND t.is_active=true
-            """, (rs, n) -> new ImageContent(rs.getBytes(1), rs.getString(2)), typeId, imageId)
+            """, (rs, n) -> {
+                if (!small) return new ImageContent(rs.getBytes(1), rs.getString(2));
+                byte[] data = rs.getBytes(3);
+                if (data != null) return new ImageContent(data, rs.getString(4));
+                try { return new ImageContent(thumbnail(ImageIO.read(new ByteArrayInputStream(rs.getBytes(1)))), "image/jpeg"); }
+                catch (IOException error) { throw new java.io.UncheckedIOException(error); }
+            }, typeId, imageId)
                 .stream().findFirst().orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "ROOM_IMAGE_NOT_FOUND", "Không tìm thấy ảnh phòng"));
+    }
+
+    private static byte[] thumbnail(BufferedImage image) throws IOException {
+        int width = Math.min(640, image.getWidth());
+        int height = Math.max(1, (int) Math.round((double) image.getHeight() * width / image.getWidth()));
+        // Also constrain portrait images; preserve proportions, never stretch.
+        if (height > 640) { width = Math.max(1, width * 640 / height); height = 640; }
+        var resized = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        var graphics = resized.createGraphics();
+        try {
+            graphics.setColor(java.awt.Color.WHITE); graphics.fillRect(0, 0, width, height);
+            graphics.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+            graphics.drawImage(image, 0, 0, width, height, null);
+        } finally { graphics.dispose(); }
+        var output = new ByteArrayOutputStream(); ImageIO.write(resized, "jpeg", output); return output.toByteArray();
     }
 
     private static ApiException invalid(String message) { return new ApiException(HttpStatus.BAD_REQUEST, "INVALID_ROOM_IMAGES", message); }

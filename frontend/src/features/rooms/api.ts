@@ -12,6 +12,7 @@ export type RoomTypeResponse = {
   active: boolean
   coverImageUrl: string | null
   images: RoomImage[]
+  amenities?: string[]
 }
 
 export const roomApi = {

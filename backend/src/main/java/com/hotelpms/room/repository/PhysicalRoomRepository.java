@@ -15,6 +15,13 @@ public interface PhysicalRoomRepository extends JpaRepository<PhysicalRoom, Long
 
     Optional<PhysicalRoom> findByRoomNumber(String roomNumber);
 
+    @Query("SELECT r.roomType.id FROM PhysicalRoom r WHERE r.id = :id")
+    Optional<Long> findRoomTypeId(@Param("id") Long id);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT r FROM PhysicalRoom r WHERE r.id = :id")
+    Optional<PhysicalRoom> lockById(@Param("id") Long id);
+
     List<PhysicalRoom> findAllByRoomTypeIdOrderByRoomNumberAsc(Long roomTypeId);
 
     List<PhysicalRoom> findAllByRoomTypeIdAndActiveTrueOrderByRoomNumberAsc(Long roomTypeId);
