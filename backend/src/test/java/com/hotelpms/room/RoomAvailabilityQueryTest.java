@@ -111,7 +111,7 @@ class RoomAvailabilityQueryTest {
     void noBookingOrBlock_roomIsAvailable() {
         Instant s = f(5), e = f(7), now = Instant.now();
         assertThat(allocationService.findAvailableRoomTypeIds(s, e, now)).contains(RT_ID);
-        assertThat(allocationService.findAndLockAvailablePhysicalRoom(RT_ID, s, e, now)).isPresent();
+        assertThat(allocationService.findAndLockAvailablePhysicalRoom(RT_ID, s, e)).isPresent();
     }
 
     // (b) Booking CONFIRMED overlap -> khong available
@@ -226,13 +226,13 @@ class RoomAvailabilityQueryTest {
         jdbc.update("UPDATE physical_rooms SET is_active=false WHERE id=?", PR_B);
         Instant s = f(65), e = f(67), now = Instant.now();
 
-        Optional<Long> first = allocationService.findAndLockAvailablePhysicalRoom(RT_ID, s, e, now);
+        Optional<Long> first = allocationService.findAndLockAvailablePhysicalRoom(RT_ID, s, e);
         assertThat(first).isPresent();
 
         insertBooking(98L, first.get(), "BK-CONC", "PENDING_PAYMENT", s, e,
                       now.plus(15, ChronoUnit.MINUTES));
 
-        Optional<Long> second = allocationService.findAndLockAvailablePhysicalRoom(RT_ID, s, e, now);
+        Optional<Long> second = allocationService.findAndLockAvailablePhysicalRoom(RT_ID, s, e);
         assertThat(second).isEmpty();
 
         jdbc.update("UPDATE physical_rooms SET is_active=true WHERE id=?", PR_B);

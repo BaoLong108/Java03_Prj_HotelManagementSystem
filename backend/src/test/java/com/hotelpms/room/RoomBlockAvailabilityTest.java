@@ -127,7 +127,7 @@ class RoomBlockAvailabilityTest {
         assertThat(avail).doesNotContain(RT_ID);
 
         // findAndLockAvailablePhysicalRoom cung tra empty
-        Optional<Long> locked = allocationService.findAndLockAvailablePhysicalRoom(RT_ID, s, e, now);
+        Optional<Long> locked = allocationService.findAndLockAvailablePhysicalRoom(RT_ID, s, e);
         assertThat(locked).isEmpty();
     }
 
@@ -199,7 +199,7 @@ class RoomBlockAvailabilityTest {
         // Room C is reserved, while the same category still has free room D.
         List<Long> avail = allocationService.findAvailableRoomTypeIds(s, e, now);
         assertThat(avail).contains(RT_ID);
-        assertThat(allocationService.findAndLockAvailablePhysicalRoom(RT_ID, s, e, now)).contains(PR_D);
+        assertThat(allocationService.findAndLockAvailablePhysicalRoom(RT_ID, s, e)).contains(PR_D);
         // -> Booking CONFIRMED khong bi anh huong boi block moi
         long bookingCount = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM bookings WHERE booking_code=? AND status='CONFIRMED'",
@@ -236,7 +236,7 @@ class RoomBlockAvailabilityTest {
         assertThat(avail).contains(RT_ID);
 
         // findAndLockAvailablePhysicalRoom phai tra PR_D (bo qua PR_C bi block)
-        Optional<Long> locked = allocationService.findAndLockAvailablePhysicalRoom(RT_ID, s, e, now);
+        Optional<Long> locked = allocationService.findAndLockAvailablePhysicalRoom(RT_ID, s, e);
         assertThat(locked).isPresent();
         assertThat(locked.get()).isEqualTo(PR_D);
     }
@@ -261,9 +261,9 @@ class RoomBlockAvailabilityTest {
 
         // Phong C bi block trong ca 2 ky
         Instant now = Instant.now();
-        assertThat(allocationService.findAndLockAvailablePhysicalRoom(RT_ID, d, dP2, now)).satisfies(opt ->
+        assertThat(allocationService.findAndLockAvailablePhysicalRoom(RT_ID, d, dP2)).satisfies(opt ->
                 opt.ifPresent(id -> assertThat(id).isNotEqualTo(PR_C)));
-        assertThat(allocationService.findAndLockAvailablePhysicalRoom(RT_ID, dP2, dP4, now)).satisfies(opt ->
+        assertThat(allocationService.findAndLockAvailablePhysicalRoom(RT_ID, dP2, dP4)).satisfies(opt ->
                 opt.ifPresent(id -> assertThat(id).isNotEqualTo(PR_C)));
     }
 

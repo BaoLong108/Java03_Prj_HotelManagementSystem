@@ -115,7 +115,7 @@ function BookingTimelineContent({ code }: { code: string }) {
 
 function StaySummary({ data, download, pdfBusy }: { data: BookingTimeline; download: () => void; pdfBusy: boolean }) {
   const { booking, room, payment } = data
-  const paymentLabel = payment?.status === 'SUCCEEDED' ? (payment.provider === 'DEMO' ? 'Đã thanh toán demo' : 'Đã thanh toán') :
+  const paymentLabel = payment?.status === 'SUCCEEDED' ? (payment.provider === 'ZERO_PAYABLE' ? 'Đã tất toán 0₫' : payment.provider === 'DEMO' ? 'Đã thanh toán demo' : 'Đã thanh toán') :
     payment?.status === 'FAILED' ? 'Lần thanh toán gần nhất thất bại' : payment?.status === 'PENDING' || booking.status === 'PENDING_PAYMENT' ?
       'Chờ thanh toán' : 'Chưa có thanh toán thành công'
   return <Card className="journey-summary">

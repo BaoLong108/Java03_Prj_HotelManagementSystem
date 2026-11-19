@@ -669,6 +669,105 @@ class BookingIntegrationTest {
     }
 
     @Test
+    void roomNumbersDetermineAssignmentAndCatalogCountsEveryEligibleRoomOnce() throws Exception {
+        String token = login("customer@hotel-pms.test", PASSWORD);
+        jdbc.update("UPDATE physical_rooms SET room_number='SEED_' || room_number WHERE room_type_id<>? AND room_number IN ('101','102')", roomTypeId);
+        jdbc.update("UPDATE physical_rooms SET room_number='102' WHERE id=?", physicalRoomId101);
+        jdbc.update("UPDATE physical_rooms SET room_number='101' WHERE id=?", physicalRoomId102);
+        try {
+            jdbc.update("""
+                INSERT INTO physical_rooms (room_type_id, room_number, is_active)
+                VALUES (?, '11', TRUE), (?, '10', TRUE), (?, '9', TRUE),
+                       (?, 'A10', TRUE), (?, 'a02', TRUE), (?, '8', FALSE)
+                """, roomTypeId, roomTypeId, roomTypeId, roomTypeId, roomTypeId, roomTypeId);
+            assertThat(availableCount(TWO_NIGHT_CHECK_IN, TWO_NIGHT_CHECK_OUT)).isEqualTo(7);
+            for (String number : List.of("9", "10", "11", "101", "102", "a02", "A10")) {
+                var response = createHold(token, TWO_NIGHT_CHECK_IN, TWO_NIGHT_CHECK_OUT);
+                assertThat(response.statusCode()).isEqualTo(201);
+                assertThat(assignedNumber(tree(response).path("bookingCode").asText())).isEqualTo(number);
+            }
+            assertThat(availableCount(TWO_NIGHT_CHECK_IN, TWO_NIGHT_CHECK_OUT)).isZero();
+            var soldOut = createHold(token, TWO_NIGHT_CHECK_IN, TWO_NIGHT_CHECK_OUT);
+            assertThat(soldOut.statusCode()).isEqualTo(409);
+            assertThat(tree(soldOut).path("code").asText()).isEqualTo("ROOM_NOT_AVAILABLE");
+        } finally {
+            bookingRepository.deleteAll();
+            jdbc.update("DELETE FROM physical_rooms WHERE room_type_id=? AND id NOT IN (?,?)", roomTypeId, physicalRoomId101, physicalRoomId102);
+            jdbc.update("UPDATE physical_rooms SET room_number='BOOKING_TEST_101' WHERE id=?", physicalRoomId101);
+            jdbc.update("UPDATE physical_rooms SET room_number='BOOKING_TEST_102' WHERE id=?", physicalRoomId102);
+            jdbc.update("UPDATE physical_rooms SET room_number=substr(room_number,6) WHERE room_type_id<>? AND room_number IN ('SEED_101','SEED_102')", roomTypeId);
+        }
+    }
+
+    @Test
+    void availabilityCannotStitchTogetherDifferentRoomsAcrossNights() throws Exception {
+        String token = login("customer@hotel-pms.test", PASSWORD);
+        String staff = login("staff@hotel-pms.test", PASSWORD);
+        Instant boundary = Instant.parse("2030-11-02T05:00:00Z");
+        var block = post("/api/v1/admin/room-blocks", Map.of("physicalRoomId", physicalRoomId102,
+                "startAt", TWO_NIGHT_CHECK_IN, "endAt", boundary, "reason", "First night"), staff);
+        assertThat(block.statusCode()).isEqualTo(201);
+        var laterStay = createHold(token, boundary, TWO_NIGHT_CHECK_OUT);
+        assertThat(laterStay.statusCode()).isEqualTo(201);
+        assertThat(assignedNumber(tree(laterStay).path("bookingCode").asText())).isEqualTo("BOOKING_TEST_101");
+        assertThat(availableCount(TWO_NIGHT_CHECK_IN, boundary)).isEqualTo(1);
+        assertThat(availableCount(boundary, TWO_NIGHT_CHECK_OUT)).isEqualTo(1);
+        assertThat(availableCount(TWO_NIGHT_CHECK_IN, TWO_NIGHT_CHECK_OUT)).isZero();
+        assertThat(createHold(token, TWO_NIGHT_CHECK_IN, TWO_NIGHT_CHECK_OUT).statusCode()).isEqualTo(409);
+    }
+
+    @Test
+    void concurrentHoldsUseDifferentRoomsAndCancellationReleasesOne() throws Exception {
+        String token = login("customer@hotel-pms.test", PASSWORD);
+        var registered = post("/api/v1/auth/register", Map.of("email", "allocation-" + UUID.randomUUID() + "@hotel-pms.test",
+                "password", PASSWORD, "fullName", "Allocation Customer"), null);
+        assertThat(registered.statusCode()).isEqualTo(201);
+        String other = tree(registered).path("accessToken").asText();
+        var first = asynchronousHold(token);
+        var second = asynchronousHold(other);
+        var responses = List.of(first.get(15, java.util.concurrent.TimeUnit.SECONDS), second.get(15, java.util.concurrent.TimeUnit.SECONDS));
+        assertThat(responses).extracting(HttpResponse::statusCode).containsExactly(201, 201);
+        String cancelledCode = tree(responses.getFirst()).path("bookingCode").asText();
+        assertThat(List.of(assignedNumber(cancelledCode), assignedNumber(tree(responses.getLast()).path("bookingCode").asText())))
+                .containsExactlyInAnyOrder("BOOKING_TEST_101", "BOOKING_TEST_102");
+
+        var next = asynchronousHold(other);
+        assertThat(post("/api/v1/bookings/" + cancelledCode + "/cancel", Map.of(), token).statusCode()).isEqualTo(200);
+        var raced = next.get(15, java.util.concurrent.TimeUnit.SECONDS);
+        assertThat(raced.statusCode()).isIn(201, 409);
+        var replacement = raced.statusCode() == 201 ? raced : createHold(other, TWO_NIGHT_CHECK_IN, TWO_NIGHT_CHECK_OUT);
+        assertThat(replacement.statusCode()).isEqualTo(201);
+        assertThat(assignedNumber(tree(replacement).path("bookingCode").asText())).isEqualTo(assignedNumber(cancelledCode));
+        assertThat(availableCount(TWO_NIGHT_CHECK_IN, TWO_NIGHT_CHECK_OUT)).isZero();
+    }
+
+    private CompletableFuture<HttpResponse<String>> asynchronousHold(String token) {
+        return CompletableFuture.supplyAsync(() -> {
+            try { return createHold(token, TWO_NIGHT_CHECK_IN, TWO_NIGHT_CHECK_OUT); }
+            catch (Exception e) { throw new java.util.concurrent.CompletionException(e); }
+        });
+    }
+
+    private HttpResponse<String> createHold(String token, Instant start, Instant end) throws Exception {
+        return post("/api/v1/bookings", new CreateBookingRequest(roomTypeId, (short) 1, start, end), token);
+    }
+
+    private String assignedNumber(String code) {
+        return jdbc.queryForObject("""
+            SELECT p.room_number FROM bookings b JOIN physical_rooms p ON p.id=b.physical_room_id WHERE b.booking_code=?
+            """, String.class, code);
+    }
+
+    private long availableCount(Instant start, Instant end) throws Exception {
+        var response = get("/api/v1/rooms/availability?startAt=" + start + "&endAt=" + end + "&guestCount=1", null);
+        assertThat(response.statusCode()).isEqualTo(200);
+        for (JsonNode type : tree(response)) {
+            if (type.path("id").asLong() == roomTypeId) return type.path("availableRoomCount").asLong();
+        }
+        return 0;
+    }
+
+    @Test
     void staffCalendarAndLookupUseRealDataAndProtectCustomerPrivacy() throws Exception {
         String token=login("customer@hotel-pms.test",PASSWORD),staff=login("staff@hotel-pms.test",PASSWORD);
         var user=userRepository.findByEmailIgnoreCase("customer@hotel-pms.test").orElseThrow();

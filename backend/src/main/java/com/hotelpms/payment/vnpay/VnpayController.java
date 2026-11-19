@@ -17,6 +17,12 @@ class VnpayController {
     @GetMapping("/availability")
     Map<String, Boolean> availability() { return Map.of("available", service.available()); }
 
+    @GetMapping("/status")
+    VnpayService.PaymentState status(@RequestParam(required = false) String bookingCode,
+            @RequestParam(required = false) String reference, @AuthenticationPrincipal Jwt jwt) {
+        return service.status(bookingCode, reference, Long.parseLong(jwt.getSubject()));
+    }
+
     @PostMapping("/checkout")
     VnpayService.Checkout checkout(@Valid @RequestBody VnpayService.CheckoutRequest request,
             @AuthenticationPrincipal Jwt jwt, HttpServletRequest http) {

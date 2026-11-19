@@ -14,9 +14,11 @@ public class DemoPaymentService {
  private final BookingRepository bookings;
  private final PaymentAttemptRepository payments;
  private final com.hotelpms.loyalty.VoucherService vouchers;
- public DemoPaymentService(BookingRepository bookings,PaymentAttemptRepository payments,com.hotelpms.loyalty.VoucherService vouchers){this.bookings=bookings;this.payments=payments;this.vouchers=vouchers;}
+ private final PaymentCheckoutPolicy policy;
+ public DemoPaymentService(BookingRepository bookings,PaymentAttemptRepository payments,com.hotelpms.loyalty.VoucherService vouchers,PaymentCheckoutPolicy policy){this.bookings=bookings;this.payments=payments;this.vouchers=vouchers;this.policy=policy;}
  @Transactional(noRollbackFor=ApiException.class)
  public PaymentResponse pay(DemoPaymentRequest request,Long actor) {
+  policy.requireDemoAdapter();
   var booking=bookings.findByBookingCodeForUpdate(request.bookingCode())
    .orElseThrow(()->new ApiException(HttpStatus.NOT_FOUND,"BOOKING_NOT_FOUND","Không tìm thấy booking"));
   if(!booking.getCustomerId().equals(actor))throw new ApiException(HttpStatus.FORBIDDEN,"FORBIDDEN","Chỉ chủ booking được thanh toán");

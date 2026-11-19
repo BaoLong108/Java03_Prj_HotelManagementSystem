@@ -1,3 +1,6 @@
 export { BookingPage } from '../src/features/booking/BookingPage'
+export { MyBookingsPage } from '../src/features/booking/MyBookingsPage'
+export { roomApi } from '../src/features/rooms/api'
 export { bookingApi } from '../src/features/booking/api'
+export { paymentApi, paymentNavigation, PaymentReturnPage } from '../src/features/booking/VnpayPayment'
 export * as auth from '../src/features/auth/AuthProvider'

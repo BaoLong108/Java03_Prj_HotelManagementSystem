@@ -95,7 +95,13 @@ public class QuoteService {
                 discountRate,
                 discountAmount,
                 payableAmount,
-                tier.name());
+                tier.name(),
+                java.util.stream.LongStream.range(0, Math.min(nights, 366)).mapToObj(offset -> {
+                    var date = firstNight.plusDays(offset);
+                    return new com.hotelpms.pricing.dto.NightlyPrice(date,
+                            money(NightlyPricing.resolve(date, basePricePerNight, rules).nightlyRate()));
+                }).toList(),
+                nights > 366);
     }
 
     private void validateRequest(QuoteRequest request) {

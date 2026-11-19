@@ -1,0 +1,117 @@
+.customer-support {
+  position: fixed;
+  z-index: 24;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  display: grid;
+  justify-items: end;
+  gap: .65rem;
+}
+.support-launcher {
+  display: inline-flex;
+  align-items: center;
+  gap: .55rem;
+  padding: .75rem 1.1rem;
+  color: #fff;
+  background: #17363d;
+  border: 1px solid #17363d;
+  border-radius: 999px;
+  box-shadow: 0 8px 22px #17363d29;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 650;
+}
+.support-panel {
+  width: min(27rem, calc(100vw - 2rem));
+  height: min(41rem, calc(100dvh - 5.6rem));
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid #dce1dc;
+  border-radius: 1rem;
+  box-shadow: 0 18px 48px #1b343631;
+  overflow: hidden;
+}
+.support-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  padding: .8rem 1rem;
+  color: #fff;
+  background: #17363d;
+}
+.support-header h2 { font-size: 1.1rem; margin: 0; color: inherit; }
+.support-header p { margin: .2rem 0 0; font-size: .82rem; color: #e9d8b7; }
+.support-header button { color: #fff; background: transparent; border: 0; font-size: 1.4rem; cursor: pointer; min-width: 2.25rem; }
+.support-controls { padding: .45rem .8rem; display: grid; gap: .4rem; max-height: 32%; overflow: auto; }
+.support-controls--bottom { border-top: 1px solid #e5e8e2; max-height: 49%; flex-shrink: 0; }
+.support-controls p, .support-room p, .support-booking p, .support-message p { margin: .25rem 0; }
+.support-messages {
+  flex: 1;
+  min-height: 3rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: .8rem;
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: .6rem;
+  background: #fafbf8;
+}
+.support-welcome { max-width: 32rem; margin: .4rem 0; color: #3e585c; }
+.support-message {
+  max-width: 95%;
+  padding: .65rem .75rem;
+  border: 1px solid #e1e7df;
+  border-radius: .65rem;
+  background: #fff;
+  overflow-wrap: anywhere;
+}
+.support-message--own { align-self: end; background: #e9f0ec; }
+.support-message header { display: flex; gap: .65rem; flex-wrap: wrap; align-items: baseline; font-size: .78rem; color: #41595c; }
+.support-message p, .support-faq-list p, .support-preview p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.support-composer, .support-actions { display: flex; align-items: end; flex-wrap: wrap; gap: .5rem; }
+.support-composer { flex-wrap: nowrap; }
+.support-composer textarea, .support-faq-form textarea {
+  width: 100%; min-width: 0; padding: .5rem; resize: vertical; color: inherit; background: #fff;
+  border: 1px solid #cad6d1; border-radius: .5rem; font: inherit;
+}
+.support-quick { display: flex; flex-wrap: wrap; gap: .35rem; }
+.support-quick button, .support-text-button, .support-history button {
+  border: 1px solid #d5dfd7; border-radius: .45rem; background: #f4f7f2; color: #17363d;
+  cursor: pointer; padding: .35rem .55rem; font: inherit; font-size: .82rem; overflow-wrap: anywhere;
+}
+.support-text-button { justify-self: start; }
+.support-history { display: grid; gap: .3rem; max-height: 7rem; overflow: auto; }
+.support-history button { text-align: left; }
+.support-stay { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; gap: .35rem .55rem; }
+.support-stay .field { min-width: 0; margin: 0; }
+.support-stay input { min-width: 0; width: 100%; }
+.support-room, .support-booking { padding: .55rem; border: 1px solid #dce1dc; border-radius: .45rem; margin: .55rem 0; }
+.support-room img { width: 100%; max-height: 9rem; object-fit: cover; border-radius: .35rem; }
+.support-room .support-actions { margin-top: .45rem; justify-content: space-between; }
+.support-count { display: inline-grid; place-items: center; min-width: 1.4rem; border-radius: 999px; padding: .05rem .25rem; background: #eedfc5; color: #233638; font-size: .75rem; }
+.support-inbox, .support-faq { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.65fr); gap: 1rem; align-items: start; }
+.support-faq { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
+.support-inbox-detail { display: grid; gap: 1rem; }
+.support-inbox-detail .support-messages { min-height: 16rem; max-height: min(55vh, 36rem); }
+.support-inbox-head { display: flex; flex-wrap: wrap; align-items: start; gap: .7rem; justify-content: space-between; }
+.support-inbox-head h2 { margin: 0; }
+.support-thread-list, .support-faq-list { list-style: none; padding: 0; margin: .5rem 0; display: grid; gap: .65rem; }
+.support-thread-list button {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .3rem; width: 100%; text-align: left;
+  color: inherit; background: #fff; border: 1px solid #dce5df; border-radius: .55rem; cursor: pointer; padding: .65rem; font: inherit;
+}
+.support-thread-list button[aria-pressed="true"] { border-color: #27575c; background: #f0f5f1; }
+.support-thread-list button > span:not(.support-count), .support-thread-list time { grid-column: 1 / -1; font-size: .82rem; overflow-wrap: anywhere; }
+.support-faq-list li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: start; gap: .5rem; padding: .75rem 0; border-bottom: 1px solid #e5e8e2; }
+.support-faq-list li > div { min-width: 0; }
+.support-faq-form { display: grid; gap: .65rem; }
+.support-preview { padding: .65rem; background: #f4f7f2; border-radius: .45rem; }
+.support-inbox .support-mobile-back { display: none; }
+@media (max-width: 768px) {
+  .support-inbox, .support-faq { grid-template-columns: minmax(0, 1fr); }
+  .support-inbox:not(.support-inbox--detail) .support-inbox-detail, .support-inbox--detail .support-inbox-list { display: none; }
+  .support-inbox .support-mobile-back { display: inline-flex; justify-self: start; }
+}

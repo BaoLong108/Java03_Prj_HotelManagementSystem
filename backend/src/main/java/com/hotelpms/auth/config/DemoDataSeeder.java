@@ -18,6 +18,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 @Component
+@org.springframework.core.annotation.Order(0)
 @Profile("dev")
 @ConditionalOnProperty(name = "app.demo-seed.enabled", havingValue = "true")
 public class DemoDataSeeder implements ApplicationRunner {

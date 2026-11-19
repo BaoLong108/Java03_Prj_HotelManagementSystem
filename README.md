@@ -26,7 +26,7 @@ docs/                    Quy ước kiến trúc, API, cộng tác
 compose.yaml             PostgreSQL + backend + frontend cho demo
 ```
 
-Backend có đăng ký/đăng nhập JWT và `/api/v1/auth/me`. Frontend có cổng khách và Staff/Admin, tìm phòng/quote thật, hold 15 phút, thanh toán demo, lịch sử booking và PDF. Trang `/account` đọc điểm, chi tiêu, hạng và lịch sử tích điểm từ database. Booking đã thanh toán và hoàn tất được cộng điểm một lần. Admin quản lý phòng/ảnh tại `/admin/rooms`, giá tại `/admin/rate-calendar`, báo cáo tại `/admin/analytics`, CSV lịch tại `/admin/booking-export`. Staff dùng lịch, tra cứu/theo ngày, `/staff/room-blocks`, `/staff/rooms` và `/staff/check-in-requests`. Customer mở chi tiết từ Kỳ nghỉ của tôi để xem Timeline và gửi giờ đến. Cấu hình VNPay/SMTP và giới hạn nghiệm thu có trong [bàn giao tích hợp](docs/sprint34-integration.md).
+Backend có đăng ký/đăng nhập JWT và `/api/v1/auth/me`. Frontend có cổng khách và Staff/Admin, tìm phòng/quote thật, hold 15 phút, thanh toán VNPay Sandbox khi đã cấu hình, lịch sử giao dịch và PDF. Trang `/account` đọc điểm, chi tiêu, hạng và lịch sử tích điểm từ database. Booking đã thanh toán và hoàn tất được cộng điểm một lần. Admin quản lý phòng/ảnh tại `/admin/rooms`, giá tại `/admin/rate-calendar`, báo cáo tại `/admin/analytics`, CSV lịch tại `/admin/booking-export`. Staff dùng lịch, tra cứu/theo ngày, `/staff/room-blocks`, `/staff/rooms` và `/staff/check-in-requests`. Customer mở chi tiết từ Kỳ nghỉ của tôi để xem Timeline và gửi giờ đến. Hướng dẫn [Concierge, FAQ và chat với nhân viên](docs/support-concierge.md). Cấu hình VNPay/SMTP và giới hạn nghiệm thu có trong [bàn giao tích hợp](docs/sprint34-integration.md).
 
 ## Chạy cả hệ thống bằng một lệnh
 

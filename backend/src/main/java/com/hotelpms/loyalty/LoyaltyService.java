@@ -10,8 +10,8 @@ import org.springframework.stereotype.Service;
 /** Pure M1-04 calculations. This service never awards points or updates a customer. */
 @Service
 public class LoyaltyService implements MembershipBenefitsProvider {
-    private static final BigDecimal VIP_THRESHOLD = new BigDecimal("10000000.00");
-    private static final BigDecimal DIAMOND_THRESHOLD = new BigDecimal("30000000.00");
+    static final BigDecimal VIP_THRESHOLD = new BigDecimal("10000000.00");
+    static final BigDecimal DIAMOND_THRESHOLD = new BigDecimal("30000000.00");
     private static final BigDecimal POINT_UNIT = new BigDecimal("10000");
     // Matches customer_profiles.eligible_spend_total / eligible_amount NUMERIC(15,2).
     private static final BigDecimal MAX_AMOUNT = new BigDecimal("9999999999999.99");

@@ -19,5 +19,11 @@ public record CreatePhysicalRoomRequest(
         String roomNumber,
 
         @Positive(message = "So tang phai lon hon 0")
-        Short floorNumber
-) { }
+        Short floorNumber,
+
+        Boolean active
+) {
+    public CreatePhysicalRoomRequest(Long roomTypeId, String roomNumber, Short floorNumber) {
+        this(roomTypeId, roomNumber, floorNumber, null);
+    }
+}

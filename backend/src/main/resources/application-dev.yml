@@ -1,5 +1,7 @@
 # Public development credentials only. Activate explicitly with the dev profile.
 spring:
+  config:
+    import: "optional:file:./.env.vnpay.local[.properties],optional:file:./backend/.env.vnpay.local[.properties]"
   datasource:
     embedded: ${DB_EMBEDDED:false}
 app:

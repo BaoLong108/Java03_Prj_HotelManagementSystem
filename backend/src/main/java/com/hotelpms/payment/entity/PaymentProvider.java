@@ -27,5 +27,7 @@ public enum PaymentProvider {
     DEMO,
 
     /** Cổng VNPay Sandbox (sẽ tích hợp ở Sprint sau). */
-    VNPAY
+    VNPAY,
+    /** Backend settlement of an exactly-zero snapshot; no gateway charge or bank transaction. */
+    ZERO_PAYABLE
 }

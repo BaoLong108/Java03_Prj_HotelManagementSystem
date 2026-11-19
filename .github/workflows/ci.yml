@@ -98,6 +98,8 @@ jobs:
       - name: Validate Compose configuration
         run: docker compose config --quiet
       - name: Build and wait for DB, API and web
+        env:
+          DEMO_PAYMENT_ENABLED: "true"
         run: docker compose up --build -d --wait --wait-timeout 240
       - name: Smoke test real APIs through the frontend proxy
         run: node scripts/smoke-demo.mjs

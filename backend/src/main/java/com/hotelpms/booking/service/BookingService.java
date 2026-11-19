@@ -98,16 +98,14 @@ public class BookingService {
         BigDecimal payableAmount = snapshot.payableAmount();
 
         // 5. Concurrency control: Find and lock an available physical room
-        Instant now = Instant.now();
         Long physicalRoomId = roomAllocationService.findAndLockAvailablePhysicalRoom(
                 request.roomTypeId(),
                 request.startAt(),
-                request.endAt(),
-                now
+                request.endAt()
         ).orElseThrow(() -> new ApiException(
                 HttpStatus.CONFLICT,
                 "ROOM_NOT_AVAILABLE",
-                "Loại phòng này không còn phòng trống trong khoảng thời gian đã chọn"
+                "Hạng phòng này đã hết phòng trong khoảng ngày bạn chọn."
         ));
 
         // 6. Generate booking code and 15-minute hold expiration

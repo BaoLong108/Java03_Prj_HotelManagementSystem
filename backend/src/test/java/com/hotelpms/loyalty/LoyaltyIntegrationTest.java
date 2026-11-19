@@ -13,6 +13,7 @@ import com.hotelpms.loyalty.dto.RedeemVoucherRequest;
 import com.hotelpms.payment.dto.DemoPaymentRequest;
 import com.hotelpms.payment.service.DemoPaymentService;
 import com.hotelpms.payment.service.BookingConfirmationService;
+import com.hotelpms.payment.service.ZeroPayableSettlementService;
 import com.hotelpms.shared.api.ApiException;
 import com.hotelpms.loyalty.repository.LoyaltyAwardRepository;
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres;
@@ -41,6 +42,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import tools.jackson.databind.ObjectMapper;
 
 @SpringBootTest
+@ActiveProfiles("test")
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @TestExecutionListeners(listeners = LoyaltyIntegrationTest.PostgresCleanupListener.class,
@@ -86,8 +88,8 @@ class LoyaltyIntegrationTest {
     @Autowired JwtService jwt;
     @Autowired UserRepository users;
     @Autowired VoucherService vouchers;
-    @Autowired VoucherReservationMaintenance voucherMaintenance;
     @Autowired DemoPaymentService demoPayments;
+    @Autowired ZeroPayableSettlementService zeroPayments;
     @Autowired BookingConfirmationService confirmations;
     @MockitoSpyBean VoucherCodeGenerator codes;
 
@@ -410,7 +412,7 @@ class LoyaltyIntegrationTest {
         var applied = vouchers.apply(hold.bookingCode(), voucher.code(), CUSTOMER);
         assertThat(applied.voucherDiscountAmount()).isEqualByComparingTo("1000000");
         assertThat(applied.payableAmount()).isZero();
-        assertThat(demoPayments.pay(new DemoPaymentRequest(hold.bookingCode(), "zero-paid-once", false), CUSTOMER).requestedAmount()).isZero();
+        assertThat(zeroPayments.settle(hold.bookingCode(), CUSTOMER).requestedAmount()).isZero();
         assertThat(bookings.completeBookingIfConfirmed(hold.id(), NOW)).isTrue();
         assertThat(accounts.summary(CUSTOMER).pointsBalance()).isZero();
         assertThat(accounts.summary(CUSTOMER).eligibleSpendTotal()).isZero();
@@ -452,7 +454,7 @@ class LoyaltyIntegrationTest {
                         .isInstanceOfSatisfying(ApiException.class, error -> assertThat(error.getCode()).isEqualTo("BOOKING_EXPIRED"));
                 case "CONFIRM" -> assertThatThrownBy(() -> bookings.confirmBooking(hold.bookingCode()))
                         .isInstanceOfSatisfying(ApiException.class, error -> assertThat(error.getCode()).isEqualTo("BOOKING_EXPIRED"));
-                case "ROOM_ALLOCATION" -> { createHold(0); voucherMaintenance.releaseExpired(CUSTOMER, Instant.now()); }
+                case "ROOM_ALLOCATION" -> createHold(0);
                 default -> throw new IllegalArgumentException(path);
             }
         }

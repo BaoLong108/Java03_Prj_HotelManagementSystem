@@ -30,6 +30,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mail.MailSendException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.*;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.support.AbstractTestExecutionListener;
@@ -41,7 +42,9 @@ import tools.jackson.databind.ObjectMapper;
         "app.booking.scheduler.enabled=false", "app.loyalty.scheduler.enabled=false",
         "app.vnpay.enabled=true", "app.vnpay.tmn-code=QA2026",
         "app.vnpay.hash-secret=public-test-only-not-a-merchant-secret",
+        "app.vnpay.ipn-url=https://payment-fixture.example.test/api/v1/payments/vnpay/ipn",
         "app.confirmation-mail.enabled=true", "app.confirmation-mail.interval-ms=3600000"})
+@ActiveProfiles("test")
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @TestExecutionListeners(listeners = Sprint34IntegrationTest.PostgresCleanup.class,

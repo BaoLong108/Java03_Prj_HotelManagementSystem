@@ -45,9 +45,16 @@ public record QuoteResponse(
 
         BigDecimal payableAmount,
 
-        String appliedTier
+        String appliedTier,
+        java.util.List<NightlyPrice> nightlyRates,
+        boolean nightlyBreakdownTruncated
 
 ) {
+    public QuoteResponse(Long roomTypeId, long nights, BigDecimal basePricePerNight, BigDecimal baseAmount,
+            BigDecimal discountRate, BigDecimal discountAmount, BigDecimal payableAmount, String appliedTier) {
+        this(roomTypeId, nights, basePricePerNight, baseAmount, discountRate, discountAmount,
+                payableAmount, appliedTier, java.util.List.of(), false);
+    }
 
     /**
      * Chuyển kết quả báo giá thành {@link PriceSnapshot} để lưu xuống booking.

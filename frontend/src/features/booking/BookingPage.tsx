@@ -1,1030 +1,294 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useLocation, useSearchParams } from 'react-router-dom'
-import { readStay, validDate } from '../rooms/search'
-import { useAuth } from '../auth/AuthProvider'
-import { bookingApi } from './api'
-import { formatHoldTime, holdSecondsRemaining } from './hold'
-import {
-  bookingStatusLabels,
-  bookingStatusTones,
-  formatDate,
-  formatDateTime,
-  formatVnd,
-  getTodayDateString,
-  getTomorrowDateString,
-  toCheckInIso,
-  toCheckOutIso,
-} from './types'
-import type { BookingResponse, PriceQuote, RoomType } from './types'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { apiAssetUrl, errorMessage } from '../../shared/api/client'
-import '../rooms/rooms.css'
-import { Alert, Badge, Button, Card, EmptyState, Field, LoadingState, PageHeader } from '../../shared/ui'
+import { Alert, Button, Card, LinkButton, LoadingState, PageHeader, PriceDisplay } from '../../shared/ui'
 import { Icon } from '../../shared/ui/Icon'
-import { VoucherInput } from './VoucherInput'
+import { useAuth } from '../auth/AuthProvider'
+import { RoomPhoto } from '../rooms/RoomCard'
+import { StaySearchForm } from '../rooms/StaySearchForm'
+import { displayDate, hasStayDates, hotelToday, nightsBetween, parseRoomTypeId, readRequestedStay, stayParams } from '../rooms/search'
+import type { StaySearch } from '../rooms/search'
+import { useSelectedRoom } from '../rooms/useSelectedRoom'
+import { roomApi } from '../rooms/api'
+import type { RoomTypeResponse } from '../rooms/api'
+import { bookingApi } from './api'
+import { BookingStatusBadge } from './BookingComponents'
+import { formatHoldTime, holdSecondsRemaining } from './hold'
+import { toCheckInIso, toCheckOutIso } from './types'
+import type { BookingResponse } from './types'
 import { VnpayPayment } from './VnpayPayment'
+import { VoucherInput } from './VoucherInput'
+import './bookingReview.css'
 
-type Step = 'SEARCH' | 'HOLD' | 'CONFIRMED'
-type ActiveTab = 'BOOKING' | 'MY_BOOKINGS'
-const EMPTY_ROOMS: RoomType[] = []
-
-export function BookingPage({ initialTab = 'BOOKING' }: { initialTab?: ActiveTab } = {}) {
-  const { user } = useAuth()
+export function BookingPage() {
+  const [params] = useSearchParams()
+  const code = params.get('bookingCode')
+  const id = parseRoomTypeId(params.get('roomTypeId'))
+  const { user, status, retry } = useAuth()
   const location = useLocation()
-  const [searchParams] = useSearchParams()
-  const initialStay = readStay(searchParams)
-  const arrival = validDate(initialStay.arrival) ? initialStay.arrival : getTodayDateString()
-  const departure = validDate(initialStay.departure) && initialStay.departure > arrival
-    ? initialStay.departure : getTomorrowDateString(arrival)
+  const from = location.pathname + location.search
+  const catalog = hasStayDates(params) ? `/rooms?${stayParams(readRequestedStay(params))}` : '/rooms'
 
-  // Navigation Tabs: 'BOOKING' | 'MY_BOOKINGS'
-  const [activeTab, setActiveTab] = useState<ActiveTab>(initialTab)
-
-  // Booking Flow Steps: 'SEARCH' (1) -> 'HOLD' (2) -> 'CONFIRMED' (3)
-  const [step, setStep] = useState<Step>('SEARCH')
-
-  // Search & Filter State
-  const [checkInDate, setCheckInDate] = useState(() => arrival)
-  const [checkOutDate, setCheckOutDate] = useState(() => departure)
-  const [guestCount, setGuestCount] = useState<number>(initialStay.adults + initialStay.children)
-
-  // Room Catalog
-  const [selectedRoomId, setSelectedRoomId] = useState<number>(() => Number(searchParams.get('roomTypeId')) || 0)
-  const [searchRetry, setSearchRetry] = useState(0)
-  const searchKey = `${checkInDate}|${checkOutDate}|${guestCount}|${searchRetry}`
-  const [availability, setAvailability] = useState<{ key: string; rooms?: RoomType[]; error?: string }>({ key: '' })
-  const currentAvailability = availability.key === searchKey ? availability : { key: searchKey }
-  const roomTypes = currentAvailability.rooms ?? EMPTY_ROOMS
-  const loadingRooms = !currentAvailability.rooms && !currentAvailability.error
-
-  // Quote and member tier come from the server.
-  const [quoteResponse, setQuoteResponse] = useState<(PriceQuote & { appliedTier: string; key: string }) | null>(null)
-
-  // Active Booking & Async State
-  const [currentBooking, setCurrentBooking] = useState<BookingResponse | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [actionError, setActionError] = useState<string | null>(null)
-  const holdMutation = useRef({ version: 0, busy: false })
-
-  // My Bookings State
-  const [myBookings, setMyBookings] = useState<BookingResponse[]>([])
-  const [loadingMyBookings, setLoadingMyBookings] = useState(false)
-
-  // Countdown Timer State for Hold (15 minutes)
-  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null)
-  const [holdRetry, setHoldRetry] = useState(0)
-  const [holdSync, setHoldSync] = useState<{ code: string; loading: boolean; error?: string }>({ code: '', loading: false })
-
-  // Search real availability; abort stale date/guest requests.
-  useEffect(() => {
-    const controller = new AbortController()
-    setActionError(null)
-    bookingApi.search({ roomTypeId: 0, guestCount, startAt: toCheckInIso(checkInDate), endAt: toCheckOutIso(checkOutDate) }, controller.signal)
-      .then(data => {
-        if (!controller.signal.aborted) {
-          setAvailability({ key: searchKey, rooms: data })
-          setSelectedRoomId(previous => data.some(room => room.id === previous) ? previous : data[0]?.id ?? 0)
-        }
-      })
-      .catch(error => { if (!controller.signal.aborted) setAvailability({ key: searchKey, error: errorMessage(error) }) })
-    return () => controller.abort()
-  }, [checkInDate, checkOutDate, guestCount, searchKey])
-
-  // Load My Bookings when switching to tab or after state change
-  const fetchMyBookings = () => {
-    if (!user) return
-    setLoadingMyBookings(true)
-    bookingApi
-      .getMyBookings()
-      .then((list) => setMyBookings(list))
-      .catch(error => setActionError(errorMessage(error)))
-      .finally(() => setLoadingMyBookings(false))
+  if (code !== null) {
+    if (!/^BK[0-9A-Z-]{1,28}$/.test(code)) return <BookingProblem title="Mã đặt phòng không hợp lệ." to="/my-bookings" label="Kỳ nghỉ của tôi" />
+    if (status === 'loading') return <LoadingState message="Đang xác thực phiên đăng nhập…" />
+    if (status === 'unavailable') return <Card><Alert>Chưa thể xác thực tài khoản.</Alert><Button onClick={retry}>Thử lại</Button></Card>
+    if (!user) return <Card><h1>Đăng nhập để tiếp tục thanh toán</h1><Link className="button button--primary" to="/login" state={{ from }}>Đăng nhập</Link></Card>
+    if (!user.roles.includes('CUSTOMER')) return <BookingProblem title="Trang thanh toán dành cho khách hàng." to="/rooms" label="Xem danh mục phòng" />
+    return <HeldBooking key={`${user.id}:${code}`} code={code} customerId={user.id} />
   }
 
-  useEffect(() => {
-    if (activeTab === 'MY_BOOKINGS' && user) {
-      fetchMyBookings()
-    }
-  }, [activeTab, user])
-
-  // Timer logic for HOLD step
-  useEffect(() => {
-    if (step !== 'HOLD' || !currentBooking?.holdExpiresAt) {
-      setRemainingSeconds(null)
-      return
-    }
-
-    const updateTimer = () => {
-      setRemainingSeconds(holdSecondsRemaining(currentBooking.holdExpiresAt))
-      // The countdown is presentation only; booking status is owned by the backend.
-    }
-
-    updateTimer()
-    const interval = setInterval(updateTimer, 1000)
-    return () => clearInterval(interval)
-  }, [step, currentBooking?.holdExpiresAt])
-
-  // Re-read on entry, periodically, and when returning to a suspended tab.
-  // Never turn a clock deadline into a locally invented booking status.
-  const pendingHoldCode = step === 'HOLD' && currentBooking?.status === 'PENDING_PAYMENT'
-    ? currentBooking.bookingCode : undefined
-  const holdDeadlineReached = remainingSeconds === 0
-  useEffect(() => {
-    const code = pendingHoldCode
-    if (!code) return
-    const controller = new AbortController()
-    let inFlight = false
-    const refresh = async () => {
-      if (inFlight || controller.signal.aborted || holdMutation.current.busy) return
-      const mutationVersion = holdMutation.current.version
-      inFlight = true
-      setHoldSync({ code, loading: true })
-      try {
-        const latest = await bookingApi.getByCode(code, controller.signal)
-        if (controller.signal.aborted || mutationVersion !== holdMutation.current.version) return
-        setCurrentBooking(previous => previous?.bookingCode === latest.bookingCode && previous.status === 'PENDING_PAYMENT' ? latest : previous)
-        if (latest.status === 'CONFIRMED' || latest.status === 'COMPLETED') setStep('CONFIRMED')
-        setHoldSync({ code, loading: false })
-      } catch (error) {
-        if (!controller.signal.aborted && mutationVersion === holdMutation.current.version) setHoldSync({ code, loading: false, error: errorMessage(error) })
-      } finally { inFlight = false }
-    }
-    void refresh()
-    const interval = setInterval(() => void refresh(), 5000)
-    const onVisible = () => { if (document.visibilityState === 'visible') void refresh() }
-    document.addEventListener('visibilitychange', onVisible)
-    window.addEventListener('focus', onVisible)
-    return () => {
-      controller.abort()
-      clearInterval(interval)
-      document.removeEventListener('visibilitychange', onVisible)
-      window.removeEventListener('focus', onVisible)
-    }
-  }, [pendingHoldCode, holdRetry, holdDeadlineReached])
-
-  const selectedRoom = useMemo<RoomType>(() =>
-    roomTypes.find(room => room.id === selectedRoomId) ?? roomTypes[0] ??
-    { id: 0, code: '', name: 'Chưa có phòng phù hợp', maxOccupancy: 0, basePricePerNight: 0 },
-  [roomTypes, selectedRoomId])
-  const quoteKey = `${selectedRoom.id}|${searchKey}|${user?.id ?? 'guest'}`
-  const quoteReady = !loadingRooms && quoteResponse?.key === quoteKey
-  const quote: PriceQuote = quoteReady ? quoteResponse : {
-    roomType: selectedRoom, guestCount, nights: 0, baseAmount: 0, discountRate: 0, discountAmount: 0, payableAmount: 0,
-  }
-  const selectedTier = quoteReady ? quoteResponse.appliedTier : 'STANDARD'
-  useEffect(() => {
-    const controller = new AbortController()
-    if (selectedRoom.id !== 0) {
-      bookingApi.quote(selectedRoom, { roomTypeId: selectedRoom.id, guestCount,
-        startAt: toCheckInIso(checkInDate), endAt: toCheckOutIso(checkOutDate) }, controller.signal)
-        .then(result => { if (!controller.signal.aborted) setQuoteResponse({ ...result, key: quoteKey }) })
-        .catch(error => { if (!controller.signal.aborted) setActionError(errorMessage(error)) })
-    }
-    return () => controller.abort()
-  }, [selectedRoom, checkInDate, checkOutDate, guestCount, quoteKey])
-
-  // Date Change Handlers
-  function handleCheckInChange(newCheckIn: string) {
-    if (!validDate(newCheckIn)) return
-    setCheckInDate(newCheckIn)
-    if (newCheckIn >= checkOutDate) {
-      setCheckOutDate(getTomorrowDateString(newCheckIn))
-    }
-  }
-
-  function handleCheckOutChange(newCheckOut: string) {
-    if (newCheckOut > checkInDate) {
-      setCheckOutDate(newCheckOut)
-    }
-  }
-
-  // Action: Step 1 -> Step 2 (Create Hold)
-  async function handleCreateHold() {
-    if (!user?.roles.includes('CUSTOMER') || !quoteReady || !selectedRoom.id || loadingRooms) return
-    setBusy(true)
-    setActionError(null)
-    try {
-      const response = await bookingApi.create({
-        roomTypeId: selectedRoom.id,
-        guestCount,
-        startAt: toCheckInIso(checkInDate),
-        endAt: toCheckOutIso(checkOutDate),
-      })
-      setCurrentBooking(response)
-      setStep('HOLD')
-      fetchMyBookings()
-    } catch (err) {
-      setActionError(errorMessage(err))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  // Action: Step 2 -> Step 3 (Confirm Payment)
-  async function handleConfirmPayment(bookingCode: string) {
-    setBusy(true)
-    setActionError(null)
-    try {
-      const response = await bookingApi.confirm(bookingCode)
-      setCurrentBooking(response)
-      setStep('CONFIRMED')
-      fetchMyBookings()
-    } catch (err) {
-      setActionError(errorMessage(err))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  // Action: Cancel Booking (from Hold or from My Bookings list)
-  async function handleCancelBooking(bookingCode: string) {
-    setBusy(true)
-    setActionError(null)
-    try {
-      const response = await bookingApi.cancel(bookingCode)
-      if (currentBooking?.bookingCode === bookingCode) {
-        setCurrentBooking(response)
-      }
-      fetchMyBookings()
-    } catch (err) {
-      setActionError(errorMessage(err))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  // Resume hold payment from My Bookings table
-  function handleResumeHold(booking: BookingResponse) {
-    setCurrentBooking(booking)
-    setStep('HOLD')
-    setActiveTab('BOOKING')
-  }
-
-  // Formatted countdown timer display (MM:SS)
-  const formattedCountdown = remainingSeconds === null ? '—' : formatHoldTime(remainingSeconds)
-  const isUrgent = remainingSeconds !== null && remainingSeconds > 0 && remainingSeconds <= 180
-  const isExpired = currentBooking?.status === 'EXPIRED'
-  const holdUnavailable = isExpired || remainingSeconds === null || remainingSeconds === 0
-  const syncingHold = pendingHoldCode !== undefined && (holdSync.code !== pendingHoldCode || holdSync.loading)
-  const holdSyncError = holdSync.code === pendingHoldCode ? holdSync.error : undefined
-  const progressPercent = Math.min(100, Math.max(0, ((remainingSeconds ?? 0) / (15 * 60)) * 100))
-
-  // Occupancy & Date validation
-  const exceedsOccupancy = selectedRoom.id !== 0 && guestCount > selectedRoom.maxOccupancy
-  const isInvalidDates = checkOutDate <= checkInDate
-
-  function onVoucherBusyChange(value: boolean) {
-    holdMutation.current = { version: holdMutation.current.version + 1, busy: value }
-    setBusy(value)
-    if (!value) setHoldRetry(current => current + 1)
-  }
-
-  return (
-    <div className="booking-container">
-      {currentBooking && ['CONFIRMED', 'COMPLETED'].includes(currentBooking.status) &&
-        <Button variant="secondary" onClick={() => bookingApi.downloadConfirmation(currentBooking.bookingCode).catch(error => setActionError(errorMessage(error)))}>
-          Tải PDF xác nhận
-        </Button>}
-      {activeTab === 'BOOKING' && step === 'SEARCH' && <>
-        {currentAvailability.rooms?.length === 0 && <Alert>Không có phòng phù hợp trong khoảng đã chọn. Bạn có thể đổi ngày hoặc số khách.</Alert>}
-        {currentAvailability.error && <Alert tone="danger">{currentAvailability.error} <Button variant="secondary" onClick={() => setSearchRetry(value => value + 1)}>Thử lại tìm phòng</Button></Alert>}
-        {!quoteReady && selectedRoom.id !== 0 && !currentAvailability.error && <Alert tone="warning">Đang lấy báo giá từ máy chủ. Chưa thể giữ phòng.</Alert>}
-      </>}
-      <PageHeader
-        eyebrow="YOUR NEXT STAY"
-        title="Kỳ nghỉ bắt đầu từ đây."
-        description="Chọn loại phòng, nhận báo giá tức thì và giữ chỗ an toàn trong 15 phút."
-        action={
-          <Link to="/rooms" className="button button--secondary">
-            <Icon name="bed" size={16} /> Danh mục phòng
-          </Link>
-        }
-      />
-
-      {/* Main Tabs */}
-      <div className="booking-tabs" role="tablist" aria-label="Phân loại chức năng đặt phòng">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === 'BOOKING'}
-          className={`booking-tab-btn ${activeTab === 'BOOKING' ? 'active' : ''}`}
-          onClick={() => setActiveTab('BOOKING')}
-        >
-          <Icon name="calendar" size={17} />
-          <span>Đặt phòng mới</span>
-        </button>
-
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === 'MY_BOOKINGS'}
-          className={`booking-tab-btn ${activeTab === 'MY_BOOKINGS' ? 'active' : ''}`}
-          onClick={() => {
-            setActiveTab('MY_BOOKINGS')
-            fetchMyBookings()
-          }}
-        >
-          <Icon name="bed" size={17} />
-          <span>Đơn đặt phòng của tôi</span>
-          {myBookings.length > 0 && (
-            <span style={{ marginLeft: '4px' }}>
-              <Badge tone="success">{myBookings.length}</Badge>
-            </span>
-          )}
-        </button>
-      </div>
-
-      {/* Global Error Banner */}
-      {actionError && (
-        <Alert tone="danger">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>{actionError}</span>
-            <Button variant="ghost" onClick={() => setActionError(null)}>
-              Đóng
-            </Button>
-          </div>
-        </Alert>
-      )}
-
-      {/* TAB 1: BOOKING FLOW */}
-      {activeTab === 'BOOKING' && (
-        <>
-          {/* Stepper */}
-          <div className="booking-steps" aria-label="Tiến trình đặt phòng">
-            <span className={step === 'SEARCH' ? 'current' : 'completed'}>
-              <b>{step === 'SEARCH' ? '1' : '✓'}</b>
-              Chọn phòng & Báo giá
-            </span>
-            <i />
-            <span
-              className={
-                step === 'HOLD' ? 'current' : step === 'CONFIRMED' ? 'completed' : ''
-              }
-            >
-              <b>{step === 'CONFIRMED' ? '✓' : '2'}</b>
-              Xác nhận giữ chỗ (15p)
-            </span>
-            <i />
-            <span className={step === 'CONFIRMED' ? 'current' : ''}>
-              <b>3</b>
-              Thanh toán Demo
-            </span>
-          </div>
-
-          {/* STEP 1: AVAILABILITY SEARCH & QUOTE */}
-          {step === 'SEARCH' && (
-            <>
-              {/* Filter / Search Card */}
-              <section className="booking-filter-card" aria-label="Bộ lọc tìm kiếm phòng">
-                <div className="filter-form-grid">
-                  <Field
-                    label="Ngày nhận phòng"
-                    type="date"
-                    min={getTodayDateString()}
-                    value={checkInDate}
-                    onChange={(e) => handleCheckInChange(e.target.value)}
-                    hint="Nhận phòng từ 12:00 trưa"
-                    required
-                  />
-
-                  <Field
-                    label="Ngày trả phòng"
-                    type="date"
-                    min={getTomorrowDateString(checkInDate)}
-                    value={checkOutDate}
-                    onChange={(e) => handleCheckOutChange(e.target.value)}
-                    hint="Trả phòng trước 10:00 sáng"
-                    required
-                  />
-
-                  <Field
-                    label="Số lượng khách"
-                    type="number"
-                    min="1"
-                    max="10"
-                    value={guestCount}
-                    onChange={(e) => setGuestCount(Math.max(1, Number(e.target.value) || 1))}
-                    hint={`Phù hợp tối đa ${selectedRoom.maxOccupancy} người`}
-                    required
-                  />
-
-                  <div className="filter-info-box">
-                    <Icon name="calendar" size={18} />
-                    <div>
-                      <span>Khoảng lưu trú: </span>
-                      <strong>{quote.nights} đêm</strong>
-                      <div className="small muted">Khoảng thời gian [12:00 - 10:00)</div>
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-              {/* Main Grid: Room Selection + Quote Breakdown */}
-              <div className="booking-main-grid">
-                {/* Left Column: Room Selection */}
-                <section className="room-selection-col" aria-label="Danh mục loại phòng">
-                  <div className="room-section-header">
-                    <h2>Chọn loại phòng</h2>
-                    <Badge tone="neutral">
-                      {loadingRooms ? 'Đang tải…' : `${roomTypes.length} loại phòng khả dụng`}
-                    </Badge>
-                  </div>
-
-                  <div className="room-selection-list" aria-busy={loadingRooms}>
-                    {loadingRooms && <LoadingState message="Đang tìm phòng trống…" />}
-                    {roomTypes.map((room) => {
-                      const isSelected = room.id === selectedRoomId
-                      const iconTone =
-                        room.code.includes('OCEAN') || room.code.includes('DELUXE')
-                          ? 'teal'
-                          : room.code.includes('PRESIDENT') || room.code.includes('SUITE')
-                            ? 'amber'
-                            : 'violet'
-
-                      return (
-                        <div key={room.id} className="booking-room-item"><div
-                          className={`room-card ${isSelected ? 'selected' : ''}`}
-                          onClick={() => setSelectedRoomId(room.id)}
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={(e) => e.key === 'Enter' && setSelectedRoomId(room.id)}
-                          aria-pressed={isSelected}
-                        >
-                          {room.coverImageUrl ? <img className="booking-room-cover" src={apiAssetUrl(room.coverImageUrl)} alt={`Ảnh bìa ${room.name}`} loading="lazy" /> : <div className={`room-card-icon ${iconTone}`}>
-                            <Icon name={room.code.includes('SUITE') ? 'shield' : 'bed'} size={24} />
-                          </div>}
-
-                          <div className="room-card-body">
-                            <div className="room-card-header">
-                              <div>
-                                <h3>{room.name}</h3>
-                                <span style={{ display: 'inline-block', marginTop: '4px' }}>
-                                  <Badge tone="neutral">Mã: {room.code}</Badge>
-                                </span>
-                              </div>
-                              <div className="room-card-price">
-                                <strong>{formatVnd(room.basePricePerNight)}</strong>
-                                <small>Giá cơ bản / đêm</small>
-                              </div>
-                            </div>
-
-                            <p className="room-card-desc">
-                              {room.description ?? 'Không gian nghỉ dưỡng tiện nghi, thoải mái.'}
-                            </p>
-
-                            <div className="room-card-footer">
-                              <div className="badge-row">
-                                <Badge tone="neutral">Tối đa {room.maxOccupancy} khách</Badge>
-                                <Badge tone="success">Sẵn sàng</Badge>
-                              </div>
-
-                              <div className="room-card-radio">
-                                <span className="radio-circle" />
-                                <span>{isSelected ? 'Đang chọn' : 'Chọn phòng'}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div><Link className="booking-room-details" to={`/rooms/${room.id}?${new URLSearchParams({ arrival: checkInDate, departure: checkOutDate, adults: String(guestCount), children: '0' })}`}>Xem ảnh & chi tiết {room.name}</Link></div>
-                      )
-                    })}
-                  </div>
-                </section>
-
-                {/* Right Column: Sticky Quote Breakdown Card */}
-                <aside className="quote-col" aria-label="Báo giá chi tiết">
-                  <Card className="quote-card">
-                    <div className="card-heading">
-                      <div>
-                        <p className="eyebrow">TẠM TÍNH CHI PHÍ</p>
-                        <h2>Chi tiết báo giá</h2>
-                      </div>
-                      <Icon name="key" size={22} />
-                    </div>
-
-                    {/* Selected Room Details */}
-                    <div className="quote-room-badge">
-                      <Icon name="bed" size={20} />
-                      <div>
-                        <strong>{selectedRoom.name}</strong>
-                        <small>
-                          {formatDate(checkInDate)} (12:00) → {formatDate(checkOutDate)} (10:00)
-                        </small>
-                      </div>
-                    </div>
-
-                    {/* Price Rows Breakdown */}
-                    <div className="quote-rows">
-                      <div className="quote-row">
-                        <span className="muted">Thời gian lưu trú</span>
-                        <strong>{quoteReady ? `${quote.nights} đêm` : '—'}</strong>
-                      </div>
-
-                      <div className="quote-row">
-                        <span className="muted">Số lượng khách</span>
-                        <strong>{guestCount} người</strong>
-                      </div>
-
-                      <div className="quote-row">
-                        <span className="muted">Giá cơ sở</span>
-                        <span>{formatVnd(quote.basePricePerNight ?? selectedRoom.basePricePerNight)} / đêm</span>
-                      </div>
-
-                      <div className="quote-row">
-                        <span className="muted">Tổng tiền phòng theo từng đêm</span>
-                        <strong>{quoteReady ? formatVnd(quote.baseAmount) : '—'}</strong>
-                      </div>
-
-                      {/* Tier Selection Preview */}
-                      <div className="quote-row">
-                        <span className="muted">Hạng hội viên</span>
-                        <div style={{ display: 'flex', gap: '4px' }}>
-                          {(['STANDARD', 'VIP', 'DIAMOND'] as const).map((t) => (
-                            <button
-                              key={t}
-                              type="button"
-                              className={`badge ${selectedTier === t ? 'badge--success' : ''}`}
-                              style={{
-                                cursor: 'pointer',
-                                border:
-                                  selectedTier === t ? '1px solid #358166' : '1px solid transparent',
-                              }}
-                              disabled
-                              title={`Hạng do hệ thống xác định: ${t}`}
-                            >
-                              {t}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {quote.discountAmount > 0 && (
-                        <div className="quote-row discount">
-                          <span>Ưu đãi thành viên ({quote.discountRate * 100}%)</span>
-                          <span>-{formatVnd(quote.discountAmount)}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Total Payable */}
-                    <div className="quote-total">
-                      <span>Tổng tạm tính</span>
-                      <strong>{quoteReady ? formatVnd(quote.payableAmount) : '—'}</strong>
-                    </div>
-
-                    {/* Member savings notice */}
-                    {selectedTier !== 'STANDARD' ? (
-                      <div className="quote-member-note">
-                        <Icon name="check" size={16} />
-                        <span>
-                          Bạn tiết kiệm được {formatVnd(quote.discountAmount)} với hạng {selectedTier}!
-                        </span>
-                      </div>
-                    ) : (
-                      <div
-                        className="quote-member-note"
-                        style={{ background: '#f5f7f8', color: '#687b80' }}
-                      >
-                        <Icon name="info" size={16} />
-                        <span>Nâng hạng VIP hoặc DIAMOND để nhận ưu đãi lên đến 15%.</span>
-                      </div>
-                    )}
-
-                    {/* Occupancy & Date Warnings */}
-                    {exceedsOccupancy && (
-                      <Alert tone="danger">
-                        Số lượng khách ({guestCount}) vượt quá sức chứa tối đa của loại phòng này (
-                        {selectedRoom.maxOccupancy} người).
-                      </Alert>
-                    )}
-
-                    {isInvalidDates && (
-                      <Alert tone="danger">Ngày trả phòng phải sau ngày nhận phòng ít nhất 1 đêm.</Alert>
-                    )}
-
-                    {/* Action Buttons */}
-                    <div className="quote-actions">
-                      {user ? (
-                        <Button
-                          variant="primary"
-                          className="button--full"
-                          disabled={exceedsOccupancy || isInvalidDates || !quoteReady || loadingRooms || !user?.roles.includes('CUSTOMER')}
-                          busy={busy}
-                          onClick={handleCreateHold}
-                        >
-                          <Icon name="calendar" size={17} />
-                          Tiến hành giữ phòng (Hold 15p)
-                        </Button>
-                      ) : (
-                        <Link to="/login" state={{ from: location.pathname + location.search }} className="button button--primary button--full">
-                          <Icon name="user" size={17} />
-                          Đăng nhập để đặt phòng
-                        </Link>
-                      )}
-                    </div>
-
-                    <p className="quote-guarantee-note">
-                      {user
-                        ? '⚡ Hệ thống sẽ tự động gán một phòng trống và giữ chỗ trong 15 phút mà không trừ tiền ngay.'
-                        : 'Bạn có thể xem trước báo giá. Vui lòng đăng nhập tài khoản để xác nhận giữ chỗ.'}
-                    </p>
-                  </Card>
-                </aside>
-              </div>
-            </>
-          )}
-
-          {/* STEP 2: HOLD CONFIRMATION & 15-MINUTE COUNTDOWN */}
-          {step === 'HOLD' && currentBooking && (
-            <Card className="hold-card">
-              <div className="hold-header">
-                <Badge tone={bookingStatusTones[currentBooking.status]}>{currentBooking.status === 'PENDING_PAYMENT' ? 'ĐANG GIỮ CHỖ TẠM THỜI' : bookingStatusLabels[currentBooking.status]}</Badge>
-                <h2>Đơn đặt phòng #{currentBooking.bookingCode}</h2>
-                <p className="muted">
-                  Thời hạn và trạng thái giữ chỗ được xác định bởi máy chủ.
-                </p>
-              </div>
-
-              {/* Countdown Timer Display */}
-              <div
-                className={`hold-timer-box ${isUrgent ? 'urgent' : ''} ${holdUnavailable ? 'expired' : ''}`}
-              >
-                <span className="small muted">THỜI GIAN GIỮ PHÒNG CÒN LẠI</span>
-                <div className="hold-timer-digits">
-                  {isExpired ? '00:00' : formattedCountdown}
-                </div>
-                <div className="hold-progress-track">
-                  <div
-                    className="hold-progress-bar"
-                    style={{ width: `${isExpired ? 0 : progressPercent}%` }}
-                  />
-                </div>
-                <span className="small" style={{ marginTop: '8px' }}>
-                  {holdUnavailable
-                    ? 'Chưa thể thanh toán. Vui lòng kiểm tra trạng thái từ máy chủ.'
-                    : isUrgent
-                      ? '⚠️ Sắp hết hạn giữ chỗ! Vui lòng hoàn tất thanh toán.'
-                      : 'Hạn giữ phòng: 15 phút kể từ lúc đặt'}
-                </span>
-              </div>
-
-              {syncingHold && <LoadingState message="Đang kiểm tra trạng thái giữ chỗ…" />}
-              {holdSyncError && <Alert tone="danger">{holdSyncError}</Alert>}
-              {pendingHoldCode && (holdUnavailable || holdSyncError) && <Button variant="secondary" busy={syncingHold} onClick={() => setHoldRetry(value => value + 1)}>Kiểm tra lại trạng thái</Button>}
-
-              {/* Booking Details Summary */}
-              <div className="booking-details-box">
-                <dl className="booking-details-grid">
-                  <div>
-                    <dt>Mã đơn đặt phòng</dt>
-                    <dd>{currentBooking.bookingCode}</dd>
-                  </div>
-                  <div>
-                    <dt>Trạng thái</dt>
-                    <dd>
-                      <Badge tone={bookingStatusTones[currentBooking.status]}>
-                        {bookingStatusLabels[currentBooking.status]}
-                      </Badge>
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Thời gian nhận phòng</dt>
-                    <dd>{formatDateTime(currentBooking.startAt)} (12:00)</dd>
-                  </div>
-                  <div>
-                    <dt>Thời gian trả phòng</dt>
-                    <dd>{formatDateTime(currentBooking.endAt)} (10:00)</dd>
-                  </div>
-                  <div>
-                    <dt>Số lượng khách</dt>
-                    <dd>{currentBooking.guestCount} người</dd>
-                  </div>
-                  <div>
-                    <dt>Hạn giữ chỗ đến</dt>
-                    <dd>{formatDateTime(currentBooking.holdExpiresAt)}</dd>
-                  </div>
-                  <div>
-                    <dt>Tiền phòng gốc</dt>
-                    <dd>{formatVnd(currentBooking.baseAmount)}</dd>
-                  </div>
-                  <div>
-                    <dt>Ưu đãi giảm giá</dt>
-                    <dd style={{ color: '#2e7d32' }}>
-                      -{formatVnd(currentBooking.discountAmount)} (
-                      {currentBooking.discountRate * 100}%)
-                    </dd>
-                  </div>
-                  <div style={{ gridColumn: 'span 2', borderTop: '1px solid #e1e9e5', paddingTop: '10px' }}>
-                    <dt>Tổng tiền cần thanh toán</dt>
-                    <dd style={{ fontSize: '18px', color: 'var(--primary)' }}>
-                      {formatVnd(currentBooking.payableAmount)}
-                    </dd>
-                  </div>
-                </dl>
-                {currentBooking.voucherCode && <p>Mã {currentBooking.voucherCode}: giảm thêm {formatVnd(currentBooking.voucherDiscountAmount ?? 0)} sau ưu đãi hạng.</p>}
-              </div>
-
-              {currentBooking.status === 'PENDING_PAYMENT' && <VoucherInput key={currentBooking.bookingCode} booking={currentBooking}
-                disabled={busy || holdUnavailable || syncingHold || Boolean(holdSyncError)} onBusyChange={onVoucherBusyChange}
-                onChange={latest => setCurrentBooking(previous => previous?.bookingCode === latest.bookingCode ? latest : previous)} />}
-
-              {/* Action Buttons */}
-              {currentBooking.status === 'CANCELLED' ? (
-                <div style={{ textAlign: 'center' }}>
-                  <Alert tone="neutral">Đơn đặt phòng này đã được hủy thành công.</Alert>
-                  <Button variant="primary" onClick={() => { setCurrentBooking(null); setStep('SEARCH') }}>Đặt phòng khác</Button>
-                </div>
-              ) : holdUnavailable ? (
-                <div style={{ textAlign: 'center' }}>
-                  <Alert tone="danger">
-                    {isExpired ? 'Máy chủ xác nhận đơn đặt phòng đã hết hạn. Vui lòng chọn phòng mới.' : 'Không còn thời gian giữ chỗ hợp lệ để thanh toán. Trạng thái booking sẽ được cập nhật từ máy chủ.'}
-                  </Alert>
-                  <Button
-                    variant="primary"
-                    onClick={() => {
-                      setCurrentBooking(null)
-                      setStep('SEARCH')
-                    }}
-                  >
-                    <Icon name="calendar" size={17} />
-                    Đặt phòng mới
-                  </Button>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <Button
-                    variant="primary"
-                    className="button--full"
-                    busy={busy}
-                    disabled={syncingHold || Boolean(holdSyncError) || currentBooking.status !== 'PENDING_PAYMENT'}
-                    onClick={() => handleConfirmPayment(currentBooking.bookingCode)}
-                  >
-                    <Icon name="check" size={18} />
-                    Thanh toán Demo ngay ({formatVnd(currentBooking.payableAmount)})
-                  </Button>
-                  {currentBooking.payableAmount > 0 && <VnpayPayment bookingCode={currentBooking.bookingCode}
-                    disabled={busy || syncingHold || Boolean(holdSyncError) || currentBooking.status !== 'PENDING_PAYMENT'} />}
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Button
-                      variant="ghost"
-                      busy={busy}
-                      onClick={() => handleCancelBooking(currentBooking.bookingCode)}
-                      style={{ color: '#b25d53' }}
-                    >
-                      <Icon name="close" size={16} />
-                      Hủy giữ chỗ
-                    </Button>
-
-                    <Button
-                      variant="ghost"
-                      disabled={busy}
-                      onClick={() => {
-                        setCurrentBooking(null)
-                        setStep('SEARCH')
-                      }}
-                    >
-                      Chọn lại loại phòng
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </Card>
-          )}
-
-          {/* STEP 3: PAYMENT CONFIRMED / COMPLETED */}
-          {step === 'CONFIRMED' && currentBooking && (
-            <Card className="booking-success-card">
-              <div className="success-icon-badge">
-                <Icon name="check" size={36} />
-              </div>
-
-              <div style={{ marginBottom: '12px' }}>
-                <Badge tone="success">THANH TOÁN THÀNH CÔNG</Badge>
-              </div>
-              <h2>Đặt phòng đã được xác nhận!</h2>
-              <p className="muted" style={{ maxWidth: '480px', margin: '0 auto 24px' }}>
-                Cảm ơn bạn! Phòng của bạn đã được đảm bảo chắc chắn cho kỳ nghỉ sắp tới. Thông tin chi tiết đã được lưu vào hệ thống.
-              </p>
-
-              <div className="booking-details-box" style={{ textAlign: 'left' }}>
-                <dl className="booking-details-grid">
-                  <div>
-                    <dt>Mã đặt phòng</dt>
-                    <dd style={{ fontSize: '15px', color: 'var(--primary)' }}>
-                      {currentBooking.bookingCode}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Trạng thái</dt>
-                    <dd>
-                      <Badge tone="success">{currentBooking.status} · {bookingStatusLabels[currentBooking.status]}</Badge>
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Ngày nhận phòng</dt>
-                    <dd>{formatDateTime(currentBooking.startAt)} (12:00)</dd>
-                  </div>
-                  <div>
-                    <dt>Ngày trả phòng</dt>
-                    <dd>{formatDateTime(currentBooking.endAt)} (10:00)</dd>
-                  </div>
-                  <div>
-                    <dt>Số khách</dt>
-                    <dd>{currentBooking.guestCount} người</dd>
-                  </div>
-                  <div>
-                    <dt>Tổng tiền đã thanh toán</dt>
-                    <dd style={{ color: 'var(--primary)', fontSize: '15px' }}>
-                      {formatVnd(currentBooking.payableAmount)}
-                    </dd>
-                  </div>
-                </dl>
-              </div>
-
-              <div className="button-row" style={{ justifyContent: 'center', marginTop: '24px' }}>
-                <Button
-                  variant="primary"
-                  onClick={() => {
-                    setActiveTab('MY_BOOKINGS')
-                    fetchMyBookings()
-                  }}
-                >
-                  <Icon name="bed" size={17} />
-                  Xem đơn đặt phòng của tôi
-                </Button>
-
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setCurrentBooking(null)
-                    setStep('SEARCH')
-                  }}
-                >
-                  Đặt thêm phòng khác
-                </Button>
-              </div>
-            </Card>
-          )}
-        </>
-      )}
-
-      {/* TAB 2: MY BOOKINGS LIST */}
-      {activeTab === 'MY_BOOKINGS' && (
-        <Card>
-          <div className="card-heading">
-            <div>
-              <p className="eyebrow">LỊCH SỬ GIAO DỊCH</p>
-              <h2>Đơn đặt phòng của tôi</h2>
-            </div>
-            <Button variant="ghost" busy={loadingMyBookings} onClick={fetchMyBookings}>
-              <Icon name="refresh" size={16} />
-              Làm mới
-            </Button>
-          </div>
-
-          {!user ? (
-            <EmptyState
-              icon="user"
-              title="Vui lòng đăng nhập"
-              description="Đăng nhập tài khoản để xem toàn bộ lịch sử đơn đặt phòng và trạng thái thanh toán."
-              action={
-                <Link to="/login" state={{ from: location.pathname + location.search }} className="button button--primary">
-                  Đăng nhập tài khoản
-                </Link>
-              }
-            />
-          ) : loadingMyBookings ? (
-            <div className="loading-state">
-              <span className="spinner" />
-              Đang tải danh sách đơn đặt phòng…
-            </div>
-          ) : myBookings.length === 0 ? (
-            <EmptyState
-              icon="calendar"
-              title="Bạn chưa có đơn đặt phòng nào"
-              description="Hãy bắt đầu chuyến đi của bạn bằng cách tìm kiếm loại phòng phù hợp."
-              action={
-                <Button variant="primary" onClick={() => setActiveTab('BOOKING')}>
-                  Tìm và đặt phòng ngay
-                </Button>
-              }
-            />
-          ) : (
-            <div className="table-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Mã đơn</th>
-                    <th>Loại phòng</th>
-                    <th>Thời gian lưu trú</th>
-                    <th>Số khách</th>
-                    <th>Tổng tiền</th>
-                    <th>Trạng thái</th>
-                    <th>Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {myBookings.map((b) => {
-                    const room = roomTypes.find((r) => r.id === b.roomTypeId)
-                    const roomName = room ? room.name : `Loại phòng #${b.roomTypeId}`
-                    const isPending = b.status === 'PENDING_PAYMENT'
-
-                    return (
-                      <tr key={b.id}>
-                        <td>
-                          <strong>{b.bookingCode}</strong>
-                          <div className="small muted">{formatDate(b.createdAt)}</div>
-                        </td>
-                        <td>
-                          <span>{roomName}</span>
-                        </td>
-                        <td>
-                          <div>
-                            {formatDate(b.startAt)} → {formatDate(b.endAt)}
-                          </div>
-                          <div className="small muted">Nhận 12:00 · Trả 10:00</div>
-                        </td>
-                        <td>{b.guestCount} khách</td>
-                        <td>
-                          <strong>{formatVnd(b.payableAmount)}</strong>
-                          {b.discountAmount > 0 && (
-                            <div className="small" style={{ color: '#2e7d32' }}>
-                              Ưu đãi hạng: −{formatVnd(b.discountAmount)}
-                            </div>
-                          )}
-                          {(b.voucherDiscountAmount ?? 0) > 0 && (
-                            <div className="small" style={{ color: '#2e7d32' }}>
-                              Mã {b.voucherCode}: −{formatVnd(b.voucherDiscountAmount ?? 0)}
-                            </div>
-                          )}
-                        </td>
-                        <td>
-                          <Badge tone={bookingStatusTones[b.status]}>
-                            {bookingStatusLabels[b.status]}
-                          </Badge>
-                        </td>
-                        <td>
-                          <div className="table-actions">
-                            <Link className="button button--ghost button--small" to={`/my-bookings/${encodeURIComponent(b.bookingCode)}`}>Chi tiết kỳ nghỉ</Link>
-                            {isPending && (
-                              <>
-                                <Button
-                                  variant="primary"
-                                  className="button--small"
-                                  onClick={() => handleResumeHold(b)}
-                                >
-                                  Thanh toán
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  className="button--small"
-                                  style={{ color: '#b25d53' }}
-                                  busy={busy}
-                                  onClick={() => handleCancelBooking(b.bookingCode)}
-                                >
-                                  Hủy
-                                </Button>
-                              </>
-                            )}
-
-                            {b.status === 'CONFIRMED' && (
-                              <Badge tone="success">
-                                <Icon name="check" size={14} /> Đã xác nhận
-                              </Badge>
-                            )}
-
-                            {b.status === 'COMPLETED' && (
-                              <span className="small muted">Đã hoàn thành</span>
-                            )}
-
-                            {(b.status === 'CANCELLED' || b.status === 'EXPIRED') && (
-                              <Button
-                                variant="ghost"
-                                className="button--small"
-                                onClick={() => {
-                                  setSelectedRoomId(b.roomTypeId)
-                                  setActiveTab('BOOKING')
-                                  setStep('SEARCH')
-                                }}
-                              >
-                                Đặt lại
-                              </Button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
-      )}
-    </div>
-  )
+  if (id === null) return <BookingProblem title={params.has('roomTypeId') ? 'Hạng phòng không hợp lệ.' : 'Bạn chưa chọn hạng phòng.'}
+    to={catalog} label="Chọn phòng" />
+  return <BookingReview key={`${user?.id ?? 'guest'}:${params}`} id={id}
+    stay={hasStayDates(params) ? readRequestedStay(params) : null} catalog={catalog} />
 }
 
+function BookingProblem({ title, to, label }: { title: string; to: string; label: string }) {
+  return <Card><h1>{title}</h1><LinkButton to={to}>{label}</LinkButton></Card>
+}
 
-export function MyBookingsPage() {
-  return <BookingPage initialTab="MY_BOOKINGS" />
+function BookingReview({ id, stay, catalog }: { id: number; stay: StaySearch | null; catalog: string }) {
+  const { user, status, retry: retryAuth } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const { room, roomError, current, validation, retry } = useSelectedRoom(id, stay)
+  const [editing, setEditing] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [failure, setFailure] = useState('')
+  const inFlight = useRef(false)
+  const active = useRef(true)
+  useEffect(() => { active.current = true; return () => { active.current = false } }, [])
+  const quote = current?.quote
+
+  async function reserve() {
+    if (!stay || !quote || !current?.available || !user?.roles.includes('CUSTOMER') || inFlight.current) return
+    inFlight.current = true
+    setBusy(true)
+    setFailure('')
+    const query = new URLSearchParams(stayParams(stay))
+    query.set('roomTypeId', String(id))
+    try {
+      const booking = await bookingApi.create({ roomTypeId: id, guestCount: stay.adults + stay.children,
+        startAt: toCheckInIso(stay.arrival), endAt: toCheckOutIso(stay.departure) })
+      if (active.current) {
+        query.set('bookingCode', booking.bookingCode)
+        navigate(`/booking?${query}`, { replace: true })
+      }
+    } catch (error) {
+      if (active.current) { setFailure(errorMessage(error)); retry() }
+    } finally {
+      inFlight.current = false
+      if (active.current) setBusy(false)
+    }
+  }
+
+  return <div className="booking-review">
+    <PageHeader title="Xem lại đặt phòng" description="Kiểm tra hạng phòng, lịch nghỉ và tổng tiền trước khi giữ chỗ."
+      action={<Link to={catalog} className="text-link">Đổi hạng phòng <Icon name="arrow" size={16} /></Link>} />
+    <BookingProgress step={1} />
+    {roomError ? <Card><Alert>{roomError}</Alert><Button variant="secondary" onClick={retry}>Thử lại</Button></Card>
+      : !room ? <LoadingState message="Đang tải hạng phòng đã chọn…" /> : <div className="booking-review-grid">
+        <div className="booking-review-main">
+          <SelectedRoom room={room} />
+          <Card><div className="booking-panel-heading"><h2>Lịch nghỉ</h2>
+            {stay && <Button variant="ghost" disabled={busy} onClick={() => setEditing(value => !value)}>{editing ? 'Đóng chỉnh sửa' : 'Chỉnh sửa'}</Button>}
+          </div>
+            {stay && <StayDetails arrival={stay.arrival} departure={stay.departure} guests={stay.adults + stay.children} />}
+            {(!stay || editing || validation) && <StaySearchForm compact destination="/booking" roomTypeId={id} onApplied={() => setEditing(false)} />}
+            {validation && <Alert tone="warning">{validation}</Alert>}
+            {stay && !validation && (!current ? <LoadingState message="Đang kiểm tra phòng trống và báo giá…" />
+              : current.error ? <><Alert>{current.error}</Alert><Button variant="secondary" onClick={retry}>Thử lại báo giá</Button></>
+              : !current.available ? <Alert tone="warning">{stay.adults + stay.children > room.maxOccupancy
+                ? 'Số khách vượt sức chứa của hạng phòng này.' : 'Hạng phòng này đã hết phòng trong khoảng ngày bạn chọn.'} <Link to={catalog}>Xem hạng phòng khác</Link></Alert>
+              : <p className="booking-available"><Icon name="check" size={17} /> Còn phòng theo lịch đã chọn</p>)}
+          </Card>
+          {failure && <Alert>{failure}</Alert>}
+        </div>
+        <Card className="booking-price-panel"><h2>Tổng tiền kỳ nghỉ</h2>
+          {quote ? <><PriceBreakdown price={quote} /><p className="small muted">Giá được chốt khi giữ phòng. Bạn có thể áp dụng voucher sau bước này.</p></>
+            : <p className="muted">Báo giá sẽ hiển thị khi xác nhận còn phòng theo lịch đã chọn.</p>}
+          {status === 'unavailable' ? <Button variant="secondary" onClick={retryAuth}>Kiểm tra lại phiên đăng nhập</Button>
+            : user?.roles.includes('CUSTOMER')
+            ? <Button busy={busy} disabled={!quote || editing} onClick={reserve}>Tiếp tục giữ phòng <Icon name="arrow" size={17} /></Button>
+            : !user && quote && !editing ? <Link className="button button--primary" to="/login" state={{ from: location.pathname + location.search }}>Đăng nhập để giữ phòng</Link>
+            : user && <p className="small muted">Dùng tài khoản khách hàng để giữ phòng.</p>}
+        </Card>
+      </div>}
+  </div>
+}
+
+function HeldBooking({ code, customerId }: { code: string; customerId: number }) {
+  const [params] = useSearchParams()
+  const [booking, setBooking] = useState<BookingResponse>()
+  const [room, setRoom] = useState<RoomTypeResponse>()
+  const [failure, setFailure] = useState('')
+  const [actionError, setActionError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [syncing, setSyncing] = useState(true)
+  const [revision, setRevision] = useState(0)
+  const [now, setNow] = useState(Date.now)
+  const mutation = useRef({ busy: false, version: 0 })
+  const pending = booking?.status === 'PENDING_PAYMENT'
+  const terminal = booking !== undefined && !pending
+  const remaining = booking ? holdSecondsRemaining(booking.holdExpiresAt, now) : null
+  const expired = remaining === 0
+  const finished = booking?.status === 'CONFIRMED' || booking?.status === 'COMPLETED'
+  const roomId = booking?.roomTypeId
+
+  useEffect(() => {
+    if (terminal) return
+    const controller = new AbortController()
+    let inFlight = false
+    async function refresh() {
+      if (inFlight || mutation.current.busy || controller.signal.aborted) return
+      const { version } = mutation.current
+      inFlight = true
+      setSyncing(true)
+      try {
+        const latest = await bookingApi.getByCode(code, controller.signal)
+        if (controller.signal.aborted || mutation.current.version !== version) return
+        if (latest.customerId !== customerId) throw new Error('Không tìm thấy đơn đặt phòng của bạn.')
+        setBooking(latest)
+        setFailure('')
+      } catch (error) {
+        if (!controller.signal.aborted && mutation.current.version === version) setFailure(errorMessage(error))
+      } finally {
+        inFlight = false
+        if (!controller.signal.aborted) setSyncing(false)
+      }
+    }
+    const visible = () => { if (document.visibilityState === 'visible') { setNow(Date.now()); void refresh() } }
+    void refresh()
+    const poll = setInterval(() => void refresh(), 5000)
+    document.addEventListener('visibilitychange', visible)
+    window.addEventListener('focus', visible)
+    return () => {
+      controller.abort()
+      clearInterval(poll)
+      document.removeEventListener('visibilitychange', visible)
+      window.removeEventListener('focus', visible)
+    }
+  }, [code, customerId, terminal, revision, expired])
+
+  useEffect(() => {
+    if (!pending) return
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [pending])
+
+  useEffect(() => {
+    if (!roomId) return
+    const controller = new AbortController()
+    roomApi.get(roomId, controller.signal).then(value => {
+      if (!controller.signal.aborted && value.id === roomId) setRoom(value)
+    }).catch(() => { if (!controller.signal.aborted) setRoom(undefined) })
+    return () => controller.abort()
+  }, [roomId])
+
+  function markBusy(value: boolean) {
+    mutation.current = { busy: value, version: mutation.current.version + 1 }
+    setBusy(value)
+    if (!value) setRevision(current => current + 1)
+  }
+
+  async function changeBooking(action: (code: string) => Promise<BookingResponse>) {
+    if (!booking || mutation.current.busy) return
+    markBusy(true)
+    setActionError('')
+    try { setBooking(await action(code)) }
+    catch (error) { setActionError(errorMessage(error)) }
+    finally { markBusy(false) }
+  }
+
+  if (!booking) return failure ? <Card><Alert>{failure}</Alert><div className="button-row">
+    <Button onClick={() => { setFailure(''); setRevision(value => value + 1) }}>Thử lại</Button>
+    <LinkButton to="/my-bookings" variant="secondary">Kỳ nghỉ của tôi</LinkButton>
+  </div></Card> : <LoadingState message="Đang tải đơn đặt phòng…" />
+
+  const arrival = hotelToday(new Date(booking.startAt))
+  const departure = hotelToday(new Date(booking.endAt))
+  const source = readRequestedStay(params)
+  const splitMatches = Number.isInteger(source.adults) && Number.isInteger(source.children)
+    && source.adults >= 1 && source.adults <= 10 && source.children >= 0 && source.children <= 10
+    && source.adults + source.children === booking.guestCount
+  const catalog = `/rooms?${stayParams({ arrival, departure, adults: splitMatches ? source.adults : Math.min(10, booking.guestCount),
+    children: splitMatches ? source.children : Math.max(0, booking.guestCount - 10) })}`
+  const disabled = busy || syncing || Boolean(failure) || remaining === null || expired
+  const zero = booking.payableAmount === 0
+  const holdEnded = booking.status === 'EXPIRED' || expired
+
+  return <div className="booking-review">
+    <PageHeader title={finished ? 'Đặt phòng đã được xác nhận' : pending && !expired ? 'Giữ phòng & thanh toán' : 'Trạng thái đặt phòng'}
+      description={`Mã đặt phòng ${booking.bookingCode}`} action={<LinkButton to="/my-bookings" variant="secondary">Kỳ nghỉ của tôi</LinkButton>} />
+    <BookingProgress step={finished ? 4 : pending && !holdEnded && !failure ? 3 : 2} />
+    <div className="booking-review-grid">
+      <div className="booking-review-main">
+        {room && <SelectedRoom room={room} />}
+        <Card><div className="booking-panel-heading"><h2>Lịch nghỉ</h2><BookingStatusBadge status={booking.status} /></div>
+          <StayDetails arrival={arrival} departure={departure} guests={booking.guestCount} />
+        </Card>
+        {holdEnded && !finished && booking.status !== 'CANCELLED' && <Alert tone="warning">
+          {booking.status === 'EXPIRED' ? 'Máy chủ xác nhận đơn đặt phòng đã hết hạn.' : 'Thời gian giữ phòng đã kết thúc.'} Hãy kiểm tra lại phòng trống để tiếp tục.
+        </Alert>}
+        {failure && <Alert>{failure} <Button variant="ghost" onClick={() => setRevision(value => value + 1)}>Kiểm tra lại trạng thái</Button></Alert>}
+        {actionError && <Alert>{actionError}</Alert>}
+        {pending && !holdEnded && <Card><div className="booking-panel-heading"><h2>Giữ phòng trong 15 phút</h2>
+          {remaining !== null && <span className="booking-clock" role="timer" aria-label={`Còn ${Math.floor(remaining / 60)} phút ${remaining % 60} giây`}>{formatHoldTime(remaining)}</span>}
+        </div>
+          {remaining === null ? <Alert tone="warning">Chưa xác định được thời hạn giữ phòng.</Alert>
+            : <p className="muted">Hoàn tất thanh toán trước khi hết thời gian giữ phòng.</p>}
+          <VoucherInput key={code} booking={booking} disabled={disabled} onChange={setBooking} onBusyChange={markBusy} />
+          <Button variant="ghost" disabled={busy} onClick={() => void changeBooking(bookingApi.cancel)}>Hủy giữ phòng</Button>
+        </Card>}
+      </div>
+      <Card className="booking-price-panel"><h2>Tổng tiền kỳ nghỉ</h2><PriceBreakdown price={booking} />
+        {finished ? <Button onClick={() => bookingApi.downloadConfirmation(code).catch(error => setActionError(errorMessage(error)))}>Tải PDF xác nhận</Button>
+          : holdEnded || booking.status === 'CANCELLED' ? <LinkButton to={catalog}>Kiểm tra phòng trống</LinkButton>
+            : zero ? <Button disabled={disabled} busy={busy} onClick={() => void changeBooking(bookingApi.settleZero)}>Xác nhận đặt phòng 0₫</Button>
+              : <VnpayPayment key={code} bookingCode={code} disabled={disabled} onBusyChange={markBusy} />}
+      </Card>
+    </div>
+  </div>
+}
+
+function BookingProgress({ step }: { step: number }) {
+  return <ol className="booking-review-progress" aria-label="Tiến trình đặt phòng">
+    {['Xem lại đặt phòng', 'Giữ phòng', 'Thanh toán'].map((label, index) => {
+      const number = index + 1
+      return <li key={label} aria-current={step === number ? 'step' : undefined} data-complete={step > number}>
+        <span className="booking-step-number" aria-hidden="true">{step > number ? <Icon name="check" size={16} /> : number}</span>
+        <span>{label}{step > number && <span className="sr-only"> · Hoàn tất</span>}</span>
+      </li>
+    })}
+  </ol>
+}
+
+function SelectedRoom({ room }: { room: RoomTypeResponse }) {
+  return <Card className="booking-selected-room">
+    <div className="booking-selected-photo"><RoomPhoto key={room.coverImageUrl} src={room.coverImageUrl ? apiAssetUrl(room.coverImageUrl) : null}
+      alt={`Ảnh bìa ${room.name}`} thumbnail eager /></div>
+    <div><h2>{room.name}</h2>{room.description && <p>{room.description}</p>}<p className="muted">Tối đa {room.maxOccupancy} khách</p>
+      {room.amenities?.length ? <ul className="amenity-list">{room.amenities.map(item => <li key={item}><Icon name="check" size={14} />{item}</li>)}</ul> : null}
+    </div>
+  </Card>
+}
+
+function StayDetails({ arrival, departure, guests }: { arrival: string; departure: string; guests: number }) {
+  const nights = nightsBetween(arrival, departure)
+  return <dl className="booking-stay-details">
+    <div><dt>Nhận phòng · 12:00</dt><dd>{displayDate(arrival)}</dd></div>
+    <div><dt>Trả phòng · 10:00</dt><dd>{displayDate(departure)}</dd></div>
+    <div><dt>Thời gian lưu trú</dt><dd>{nights === null ? '—' : `${nights} đêm`}</dd></div>
+    <div><dt>Số khách</dt><dd>{Number.isFinite(guests) ? `${guests} khách` : '—'}</dd></div>
+  </dl>
+}
+
+function PriceBreakdown({ price }: { price: { baseAmount: number; discountAmount: number; payableAmount: number; voucherDiscountAmount?: number } }) {
+  return <dl className="booking-price-lines">
+    <div><dt>Giá phòng gốc</dt><dd><PriceDisplay amount={price.baseAmount} /></dd></div>
+    <div><dt>Ưu đãi thành viên</dt><dd>{price.discountAmount > 0 ? '−' : ''}<PriceDisplay amount={price.discountAmount} /></dd></div>
+    {Boolean(price.voucherDiscountAmount) && <div><dt>Giảm giá voucher</dt><dd>−<PriceDisplay amount={price.voucherDiscountAmount} /></dd></div>}
+    <div className="booking-total"><dt>Tổng tiền cần thanh toán</dt><dd><PriceDisplay amount={price.payableAmount} /></dd></div>
+  </dl>
 }

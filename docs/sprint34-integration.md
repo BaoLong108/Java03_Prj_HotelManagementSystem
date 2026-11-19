@@ -25,14 +25,14 @@
 
 ## VNPay Sandbox
 
-Mặc định tắt. Khai báo `VNPAY_ENABLED=true`, `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET`, `VNPAY_RETURN_URL` trong môi trường local hoặc file .env được ignore. Nút Sandbox chỉ hiện cho Customer khi cấu hình đầy đủ. Chỉ chấp nhận host thanh toán Sandbox cố định.
+Mặc định tắt. Khai báo `VNPAY_ENABLED=true`, `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET`, `VNPAY_RETURN_URL` và `VNPAY_IPN_URL` trong môi trường local hoặc file .env được ignore. Customer có thể bắt đầu thanh toán Sandbox sau khi cấu hình đầy đủ. Chỉ chấp nhận host thanh toán Sandbox cố định.
 
-- `POST /api/v1/payments/vnpay/checkout` nhận bookingCode, idempotencyKey. JWT xác định owner. Lưu payment attempt, lấy amount từ snapshot. Một booking chỉ dùng lại một checkout đang chờ; tiền 0 ₫ dùng luồng demo đã có.
+- `POST /api/v1/payments/vnpay/checkout` nhận bookingCode, idempotencyKey. JWT xác định owner. Lưu payment attempt, lấy amount từ snapshot. Một booking chỉ dùng lại một checkout đang chờ; booking 0 ₫ dùng `POST /api/v1/payments/zero` để xác nhận không thu tiền.
 - `GET /api/v1/payments/vnpay/ipn` là callback public được xác thực bằng HMAC-SHA512. Kiểm merchant, amount nhân 100, mã giao dịch và trạng thái. Khóa cùng booking với payment/expiry/cancellation. Chỉ một payment SUCCEEDED được phép.
 - Return về `/payment-return` chỉ đọc lại trạng thái Booking có quyền sở hữu. Các trường query do trình duyệt gửi không xác nhận thanh toán.
 - IPN đã xử lý trả RspCode 02. Sai chữ ký 97, sai amount 04, không có giao dịch 01. Sai dữ liệu hoặc trùng mã giao dịch trả 99.
 - Thành công đến sau hold, sau thanh toán khác hoặc sau thay đổi snapshot được ghi `vnpay_checkouts.outcome=REVIEW_REQUIRED`, có response/transaction/time để đối soát. Booking được giữ theo vòng đời hiện tại. Cần đối soát với merchant để xử lý tiền nếu trường hợp này xảy ra.
-- API luồng demo từ chối khi đang có checkout VNPay chờ xử lý.
+- API thanh toán demo chỉ dành cho profile `dev` hoặc `test` và cần bật `DEMO_PAYMENT_ENABLED=true` khi chạy smoke test local. Giao dịch VNPay đang chờ chặn luồng demo.
 
 Đăng ký IPN URL HTTPS công khai với merchant sandbox. Localhost cần một địa chỉ thử nghiệm do nhóm cấu hình để server VNPay có thể gọi tới. Tài liệu nguồn là [đặc tả PAY 2.1.0 của VNPAY](https://sandbox.vnpayment.vn/apis/docs/thanh-toan-pay/pay.html).
 

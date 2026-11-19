@@ -5,8 +5,11 @@ import { RequireAuth } from './features/auth/RequireAuth'
 import { AccountPage } from './features/auth/AccountPage'
 import { DashboardPage } from './features/dashboard/DashboardPage'
 import { RoomDetailPage, RoomsPage } from './features/rooms/RoomsPage'
-import { BookingPage, MyBookingsPage } from './features/booking/BookingPage'
-import { AdminPage, StaffPage, AdminRoomsPage, AdminMembersPage, AdminSettingsPage, RoomOperationsPage } from './features/staff/WorkspacePages'
+import { BookingPage } from './features/booking/BookingPage'
+import { MyBookingsPage } from './features/booking/MyBookingsPage'
+import { AdminPage, StaffPage, AdminRoomsPage, AdminSettingsPage, RoomOperationsPage } from './features/staff/WorkspacePages'
+import { AdminMembersPage } from './features/crm/AdminMembersPage'
+import { CustomerProfilePage } from './features/crm/CustomerProfilePage'
 import { AppLayout, RouteEffects, StaffLayout } from './shared/layout/AppLayout'
 import { StaffLayout as StaffSectionLayout } from './features/staff/StaffLayout'
 import { ForbiddenPage, NotFoundPage, UiKitPage } from './shared/ui/ExamplePages'
@@ -20,6 +23,9 @@ import { StaffCheckInPage } from './features/checkin/StaffCheckInPage'
 import { StaffBookings } from './features/staff/bookings/DailyBookings'
 import { BookingExportPage } from './features/staff/bookings/BookingExportPage'
 import { PaymentReturnPage } from './features/booking/VnpayPayment'
+import { TransactionHistoryPage } from './features/transactions/TransactionHistoryPage'
+import { StaffSupportPage } from './features/support/StaffSupportPage'
+import { AdminFaqPage } from './features/support/AdminFaqPage'
 
 export default function App() {
   return <ToastProvider><AuthProvider><RouteEffects /><Routes><Route element={<AppLayout />}>
@@ -31,9 +37,10 @@ export default function App() {
     <Route path="register" element={<AuthPage mode="register" />} />
     <Route element={<RequireAuth />}><Route path="account" element={<AccountPage />} /></Route>
     <Route element={<RequireAuth roles={['CUSTOMER']} />}>
+      <Route path="payment-return" element={<PaymentReturnPage />} />
+      <Route path="account/transactions" element={<TransactionHistoryPage />} />
       <Route path="my-bookings" element={<MyBookingsPage />} />
       <Route path="my-bookings/:bookingCode" element={<BookingTimelinePage />} />
-      <Route path="payment-return" element={<PaymentReturnPage />} />
     </Route>
     <Route path="ui-kit" element={<UiKitPage />} />
     <Route path="403" element={<ForbiddenPage />} />
@@ -48,6 +55,7 @@ export default function App() {
       <Route path="staff/rooms" element={<FloorMapPage />} />
       <Route path="staff/room-blocks" element={<RoomOperationsPage />} />
       <Route path="staff/check-in-requests" element={<StaffCheckInPage />} />
+      <Route path="staff/support" element={<StaffSupportPage />} />
     </Route>
     <Route element={<RequireAuth roles={['ADMIN']} />}>
       <Route path="admin" element={<AdminPage />} />
@@ -56,7 +64,9 @@ export default function App() {
       <Route path="admin/analytics" element={<AnalyticsPage />} />
       <Route path="admin/booking-export" element={<BookingExportPage />} />
       <Route path="admin/members" element={<AdminMembersPage />} />
+      <Route path="admin/members/:customerId" element={<CustomerProfilePage />} />
       <Route path="admin/settings" element={<AdminSettingsPage />} />
+      <Route path="admin/support/faq" element={<AdminFaqPage />} />
     </Route>
   </Route></Routes></AuthProvider></ToastProvider>
 }

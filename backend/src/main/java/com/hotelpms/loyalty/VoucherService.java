@@ -74,6 +74,7 @@ public class VoucherService {
     @Transactional
     public BookingResponse apply(String bookingCode, String code, Long actor) {
         var booking = lockOwnedHold(bookingCode, actor);
+        requireNoGatewayPayment(booking.getId());
         if (booking.getVoucherCode() != null && !booking.getVoucherCode().equals(code))
             throw error("REMOVE_CURRENT_VOUCHER", "Vui lòng gỡ mã hiện tại trước khi dùng mã khác");
         var voucher = vouchers.lockByCode(code).filter(value -> value.getCustomerId().equals(actor))
@@ -91,9 +92,15 @@ public class VoucherService {
     @Transactional
     public BookingResponse remove(String bookingCode, Long actor) {
         var booking = lockOwnedHold(bookingCode, actor);
+        requireNoGatewayPayment(booking.getId());
         releaseForBooking(booking.getId());
         booking.removeVoucher();
         return BookingResponse.from(bookings.saveAndFlush(booking));
+    }
+
+    private void requireNoGatewayPayment(long bookingId) {
+        if (Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM payment_attempts WHERE booking_id=? AND provider='VNPAY' AND status='PENDING')", Boolean.class, bookingId)))
+            throw error("PAYMENT_IN_PROGRESS", "Đang có giao dịch VNPay. Không thể thay mã giảm giá trong lúc thanh toán.");
     }
 
     /** Caller already holds the booking lock. Validate before any writes on the payment path. */

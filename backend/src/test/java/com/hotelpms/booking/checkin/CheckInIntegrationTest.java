@@ -25,6 +25,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.MockMvcPrint;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestContext;
@@ -35,6 +36,7 @@ import org.springframework.test.web.servlet.RequestBuilder;
 import tools.jackson.databind.ObjectMapper;
 
 @SpringBootTest(properties = {"app.booking.scheduler.enabled=false", "app.loyalty.scheduler.enabled=false"})
+@ActiveProfiles("test")
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @TestExecutionListeners(listeners = CheckInIntegrationTest.PostgresCleanup.class,
