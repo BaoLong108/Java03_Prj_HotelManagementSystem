@@ -10,6 +10,16 @@ final class ReportFilters {
     static final ZoneId ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     static final Set<String> STATUSES = Set.of("PENDING_PAYMENT", "CONFIRMED", "COMPLETED", "CANCELLED", "EXPIRED");
     private ReportFilters() { }
+    record Period(LocalDate from, LocalDate to) {
+        java.time.Instant start() { return from.atStartOfDay(ZONE).toInstant(); }
+        java.time.Instant end() { return to.atStartOfDay(ZONE).toInstant(); }
+    }
+    static Period period(String from, String to) {
+        var start = date(from); var end = date(to);
+        long days = java.time.temporal.ChronoUnit.DAYS.between(start, end);
+        if (days < 1 || days > 92) throw invalid();
+        return new Period(start, end);
+    }
     static ApiException invalid() {
         return new ApiException(HttpStatus.BAD_REQUEST, "INVALID_FILTER", "Bộ lọc ngày, phòng hoặc trạng thái không hợp lệ");
     }

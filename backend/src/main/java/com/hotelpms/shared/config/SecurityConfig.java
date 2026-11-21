@@ -64,6 +64,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/payments").hasRole("CUSTOMER")
                         .requestMatchers(HttpMethod.GET, "/api/v1/payments/attempts/{id}").hasRole("CUSTOMER")
                         .requestMatchers(HttpMethod.GET, "/api/v1/staff/bookings/daily").hasAnyRole("STAFF", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/staff/reports/summary", "/api/v1/staff/reports/room-block-history").hasAnyRole("STAFF", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/admin/reports/bookings.csv").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/staff/room-calendar", "/api/v1/staff/bookings/search", "/api/v1/staff/floor-overview")
                             .hasAnyRole("STAFF", "ADMIN")
                         .requestMatchers("/api/v1/admin/rate-calendar", "/api/v1/admin/rate-calendar/**",
