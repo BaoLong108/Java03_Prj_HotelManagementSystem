@@ -11,4 +11,4 @@ app:
     secret: ${JWT_SECRET:hotel-pms-development-signing-key-change-outside-local-dev}
   demo-seed:
     enabled: ${DEMO_SEED_ENABLED:true}
-    password: ${DEMO_SEED_PASSWORD:HotelPmsDemo123!}
+    password: ${DEMO_SEED_PASSWORD:123456}

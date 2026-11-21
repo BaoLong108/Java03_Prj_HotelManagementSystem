@@ -101,4 +101,4 @@ npm run dev
 
 Mở `http://localhost:5173/login`; health API: `http://localhost:8080/actuator/health`. Vite proxy `/api` và `/actuator` sang localhost:8080.
 
-Tài khoản profile dev: `customer@hotel-pms.test`, `staff@hotel-pms.test`, `admin@hotel-pms.test`, mật khẩu công khai dùng local: `HotelPmsDemo123!`. Seeder không ghi đè tài khoản đã tồn tại; nếu đã đổi mật khẩu dùng giá trị local của mình. `JWT_SECRET` mặc định chỉ có trong profile dev; môi trường khác cần secret riêng và adapter Pricing thật, không dùng fallback dev để triển khai production.
+Tài khoản profile dev: `customer@hotel-pms.test`, `staff@hotel-pms.test`, `admin@hotel-pms.test`, mật khẩu công khai dùng local: `123456`. Seeder không ghi đè tài khoản đã tồn tại; nếu đã đổi mật khẩu dùng giá trị local của mình. `JWT_SECRET` mặc định chỉ có trong profile dev; môi trường khác cần secret riêng và adapter Pricing thật, không dùng fallback dev để triển khai production.

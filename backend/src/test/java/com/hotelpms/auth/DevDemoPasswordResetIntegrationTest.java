@@ -20,6 +20,7 @@ import org.springframework.test.context.*;
 import org.springframework.test.context.support.AbstractTestExecutionListener;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
@@ -35,7 +36,7 @@ class DevDemoPasswordResetIntegrationTest {
         postgres = EmbeddedPostgres.builder().setPort(0).start();
         properties.add("spring.datasource.url", () -> postgres.getJdbcUrl("postgres", "postgres"));
         properties.add("spring.datasource.username", () -> "postgres"); properties.add("spring.datasource.password", () -> "postgres");
-        properties.add("app.demo-seed.enabled", () -> "true"); properties.add("app.demo-seed.password", () -> "TestDemo123!");
+        properties.add("app.demo-seed.enabled", () -> "true");
     }
     public static class Cleanup extends AbstractTestExecutionListener {
         @Override public int getOrder() { return 1000; }
@@ -67,6 +68,16 @@ class DevDemoPasswordResetIntegrationTest {
                 .andExpect(status().is(status)).andReturn().getResponse().getContentAsString();
         return status == 200 ? json.readTree(response).get("accessToken").asText() : null;
     }
+    @Test @Transactional
+    void seedsFreshDemoAccountsWithTheConfiguredDefaultPassword() throws Exception {
+        for (String role : DEMOS.keySet()) {
+            jdbc.update("UPDATE app_users SET email = ? WHERE email = ?",
+                    "previous-" + role + "@hotel-pms.test", role + "@hotel-pms.test");
+        }
+        seeder.run(new DefaultApplicationArguments());
+        for (String role : DEMOS.keySet()) login(role + "@hotel-pms.test", "123456", 200);
+    }
+
     @Test void resetsOnlyAllowlistedDemoIdentitiesUsingBcryptAndNormalJwt() throws Exception {
         reset("postgres");
         for (var role : DEMOS.entrySet()) {
@@ -104,12 +115,13 @@ class DevDemoPasswordResetIntegrationTest {
         for (String role : DEMOS.keySet()) assertThat(encoder.matches("TestDemo123!", jdbc.queryForObject(
                 "SELECT password_hash FROM app_users WHERE email=?", String.class, role + "@hotel-pms.test"))).isTrue();
     }
-    @Test void explicitResetBeanIsUnavailableInProduction() {
+    @Test void demoSeederAndResetAreUnavailableWithAProductionProfile() {
         try (var context = new org.springframework.context.annotation.AnnotationConfigApplicationContext()) {
-            context.getEnvironment().setActiveProfiles("prod");
-            context.getEnvironment().getPropertySources().addFirst(new org.springframework.core.env.MapPropertySource("explicit-command", Map.of("app.demo-reset.enabled", true)));
-            context.register(DevDemoPasswordReset.class); context.refresh();
+            context.getEnvironment().setActiveProfiles("dev", "prod");
+            context.getEnvironment().getPropertySources().addFirst(new org.springframework.core.env.MapPropertySource("explicit-command", Map.of("app.demo-reset.enabled", true, "app.demo-seed.enabled", true)));
+            context.register(DevDemoPasswordReset.class, DemoDataSeeder.class); context.refresh();
             assertThat(context.getBeanNamesForType(DevDemoPasswordReset.class)).isEmpty();
+            assertThat(context.getBeanNamesForType(DemoDataSeeder.class)).isEmpty();
         }
     }
 }

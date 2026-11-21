@@ -50,7 +50,7 @@ public class DevDemoPasswordReset implements ApplicationRunner {
                     """, Long.class, entry.getKey(), expectedName, entry.getValue());
             if (ids.size() != 1) throw new IllegalStateException("Demo allowlist identity/role does not match: " + entry.getKey());
             jdbc.update("UPDATE app_users SET password_hash=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
-                    encoder.encode("123456"), ids.getFirst());
+                    encoder.encode(DemoDataSeeder.DEFAULT_DEMO_PASSWORD), ids.getFirst());
         }
     }
 }

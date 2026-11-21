@@ -27,7 +27,7 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:-hotel_pms_dev}
       JWT_SECRET: ${JWT_SECRET:-hotel-pms-compose-demo-only-signing-key-change-before-deployment}
       DEMO_SEED_ENABLED: ${DEMO_SEED_ENABLED:-true}
-      DEMO_SEED_PASSWORD: ${DEMO_SEED_PASSWORD:-HotelPmsDemo123!}
+      DEMO_SEED_PASSWORD: ${DEMO_SEED_PASSWORD:-123456}
       VNPAY_ENABLED: ${VNPAY_ENABLED:-false}
       VNPAY_TMN_CODE: ${VNPAY_TMN_CODE:-}
       VNPAY_HASH_SECRET: ${VNPAY_HASH_SECRET:-}

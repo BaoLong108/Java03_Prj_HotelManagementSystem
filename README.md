@@ -38,7 +38,7 @@ Cần Docker Desktop/Engine với Compose v2 đang chạy. Tại gốc repositor
 docker compose up --build -d --wait
 ```
 
-Mở [web đăng nhập](http://localhost:5173/login). Tài khoản seed gồm `customer@hotel-pms.test`, `staff@hotel-pms.test` và `admin@hotel-pms.test`. Mật khẩu demo trên database mới là `HotelPmsDemo123!`. Database cũ giữ nguyên mật khẩu đã đặt.
+Mở [web đăng nhập](http://localhost:5173/login). Tài khoản seed gồm `customer@hotel-pms.test`, `staff@hotel-pms.test` và `admin@hotel-pms.test`. Mật khẩu demo trên database mới là `123456`. Database cũ giữ nguyên mật khẩu đã đặt.
 
 Compose dùng named volume `postgres_data` để giữ dữ liệu. `docker compose stop` hoặc `docker compose down` không xóa dữ liệu. Muốn chạy lại: dùng lệnh `up` ở trên. `.env.example` chứa cấu hình demo công khai, sao chép sang `.env` khi cần đổi port/mật khẩu. Nếu đang chạy local riêng, dừng các server đó hoặc đổi `WEB_PORT`, `API_PORT`, `POSTGRES_PORT` để tránh trùng port. Backend dùng Flyway và `ddl-auto=validate`, không tạo lại bảng mỗi lần chạy.
 
@@ -57,7 +57,7 @@ Backend mặc định dùng `jdbc:postgresql://localhost:5432/hotel_pms`, user `
 
 Không có Docker/PostgreSQL: đặt `$env:DB_EMBEDDED='true'` trong PowerShell backend rồi chạy profile `dev` như trên. Embedded PostgreSQL tự chọn port trống (đổi bằng `DEV_POSTGRES_PORT`), tạo dữ liệu tạm mới mỗi lần chạy; API vẫn ở port 8080. Muốn lưu dữ liệu qua các lần chạy, dùng Compose hoặc PostgreSQL riêng. Xem [hướng dẫn chi tiết và cách chạy test](docs/sprint1-stabilization.md).
 
-Profile `dev` tạo ba tài khoản: `customer@hotel-pms.test`, `staff@hotel-pms.test`, `admin@hotel-pms.test`; mật khẩu demo chung là `HotelPmsDemo123!`. Có thể đổi bằng `DEMO_SEED_PASSWORD` trước lần seed đầu tiên, hoặc tắt bằng `DEMO_SEED_ENABLED=false`. Seeder không ghi đè tài khoản đã tồn tại. Ngoài `dev`, phải cung cấp `JWT_SECRET` ngẫu nhiên dài ít nhất 32 ký tự; không có mật khẩu hay signing key mặc định cho môi trường đó.
+Profile `dev` tạo ba tài khoản: `customer@hotel-pms.test`, `staff@hotel-pms.test`, `admin@hotel-pms.test`; mật khẩu demo chung là `123456`. Có thể đổi bằng `DEMO_SEED_PASSWORD` trước lần seed đầu tiên, hoặc tắt bằng `DEMO_SEED_ENABLED=false`. Seeder không ghi đè tài khoản đã tồn tại. Ngoài `dev`, phải cung cấp `JWT_SECRET` ngẫu nhiên dài ít nhất 32 ký tự; không có mật khẩu hay signing key mặc định cho môi trường đó.
 
 ## Kiểm tra trước PR
 

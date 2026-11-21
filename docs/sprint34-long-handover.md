@@ -67,7 +67,7 @@ docker compose logs --tail 100 backend frontend
 - Web: `http://localhost:5173/login`; backend health: `http://localhost:8080/actuator/health`.
 - PostgreSQL 17 dùng named volume `postgres_data`; API dùng Java 21, FE build Node 22 và phục vụ bằng Nginx, proxy cùng origin `/api`. Fixture mode tắt.
 - Ba email: `customer@hotel-pms.test`, `staff@hotel-pms.test`, `admin@hotel-pms.test`.
-- Database mới dùng mật khẩu demo `HotelPmsDemo123!`. Seed giữ nguyên mật khẩu và booking hiện có. Nếu đổi `DEMO_SEED_PASSWORD`, dùng mật khẩu đáp ứng chính sách tạo tài khoản.
+- Database mới dùng mật khẩu demo `123456`. Seed giữ nguyên mật khẩu và booking hiện có. Nếu đổi `DEMO_SEED_PASSWORD`, dùng mật khẩu đáp ứng chính sách tạo tài khoản.
 - Dừng bằng `docker compose stop` hoặc `docker compose down`; bật lại bằng lệnh `up`. Không thêm `--volumes` nếu muốn giữ DB. Xóa volume là reset dữ liệu, không phải bước chạy demo.
 - `.env.example` chỉ có giá trị demo công khai. `.env` thật bị gitignore. Profile `dev` chỉ phục vụ môi trường demo/local, không phải cấu hình deploy public.
 - Compose dùng volume riêng, tách biệt với PostgreSQL chạy trực tiếp trên máy.
